@@ -1,13 +1,13 @@
 [tool.poetry]
 name = "django-app-parameter"
-version = "0.1.0"
+version = "0.1.2"
 description = "App-Parameter is a very simple Django app to save application's parameter in the database."
 authors = ["Swann <swann.bouviermuller@gmail.com>"]
 maintainers = ["Swann <swann.bouviermuller@gmail.com>"]
-license = "MIT"
+license = "CC0 1.0 Universal"
 readme = "README.md"
-homepage = ""
-repository = ""
+homepage = "https://github.com/Swannbm/django-app-parameter"
+repository = "https://github.com/Swannbm/django-app-parameter"
 documentation = ""
 keywords = [
     "Django",
@@ -17,9 +17,6 @@ keywords = [
 
 [tool.poetry.dependencies]
 python = "^3.7"
-django = "^3.2"
-loguru = "*"
-psutil = "*"
 
 [tool.poetry.dev-dependencies]
 

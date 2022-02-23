@@ -2,7 +2,7 @@ import logging
 
 from django.core.management.base import BaseCommand
 
-from app_parameter.models import Parameter
+from django_app_parameter.models import Parameter
 
 
 logger = logging.getLogger("management.commands")

@@ -4,6 +4,7 @@ from decimal import Decimal
 
 from django.core.exceptions import ImproperlyConfigured
 from django.db import models
+from django.utils.text import slugify
 
 
 class ParameterManager(models.Manager):
@@ -29,7 +30,7 @@ class ParameterManager(models.Manager):
     def json(self, slug):
         return self.get_from_slug(slug).json()
 
-    def create_if_not_exists(self, parameter, update=False):
+    def create_or_update(self, parameter, update=True):
         try:
             param = Parameter.objects.get(slug=parameter["slug"])
             result = "Already exists"
@@ -43,7 +44,8 @@ class ParameterManager(models.Manager):
                 result += ", updated"
             return result
         except Parameter.DoesNotExist:
-            Parameter.objects.create(**parameter)
+            param = Parameter(**parameter)
+            param.save()
             return "Added"
 
 
@@ -67,11 +69,16 @@ class Parameter(models.Model):
     value = models.CharField("Valeur", max_length=250)
     is_global = models.BooleanField(default=False)
 
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            self.slug = slugify(self.name).upper()
+        super().save(*args, **kwargs)
+
     def int(self):
         return int(self.value)
 
     def str(self):
-        return self.value
+        return str(self.value)
 
     def float(self):
         return float(self.value)
