@@ -71,7 +71,7 @@ class Parameter(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.slug:
-            self.slug = slugify(self.name).upper()
+            self.slug = slugify(self.name).upper().replace("-", "_")
         super().save(*args, **kwargs)
 
     def int(self):

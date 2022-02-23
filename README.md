@@ -36,12 +36,12 @@ If you want to have your global parameter available in template, activate the pr
 
 ## Usage
 
-Use admin interface to add parameters. You can access a parameter in your code use the "slug" field. It's built at first save with: slugify(self.name).upper(), examples:
+Use admin interface to add parameters. You can access a parameter in your code use the "slug" field. It's built at first save with: slugify(self.name).upper().replace("-", "_"), examples:
 
 ```
     self.name     ==> self.slug()
-    blog title    ==> BLOG-TITLE
-    sender e-mail ==> SENDER-E-MAIL
+    blog title    ==> BLOG_TITLE
+    sender e-mail ==> SENDER_E_MAIL
     ##weird@Na_me ==> WERIDNA_ME
 ```
 
