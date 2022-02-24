@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "django-app-parameter"
-version = "0.1.3"
+version = "1.0.0"
 description = "App-Parameter is a very simple Django app to save application's parameter in the database."
 authors = ["Swann <swann.bouviermuller@gmail.com>"]
 maintainers = ["Swann <swann.bouviermuller@gmail.com>"]
