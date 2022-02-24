@@ -7,6 +7,16 @@ from django.db import models
 from django.utils.text import slugify
 
 
+def parameter_slugify(content):
+    """
+    Transform content :
+    * slugify (with django's function)
+    * upperise
+    * replace dash (-) with underscore (_)
+    """
+    return slugify(content).upper().replace("-", "_")
+
+
 class ParameterManager(models.Manager):
     def get_from_slug(self, slug):
         """Send ImproperlyConfigured exception if parameter is not in DB"""
@@ -31,11 +41,14 @@ class ParameterManager(models.Manager):
         return self.get_from_slug(slug).json()
 
     def create_or_update(self, parameter, update=True):
+        # add slug if not set
+        if "slug" not in parameter:
+            parameter["slug"] = parameter_slugify(parameter["name"])
         try:
             param = Parameter.objects.get(slug=parameter["slug"])
             result = "Already exists"
             if update:
-                param.name = parameter.get("name", "")
+                param.name = parameter["name"]
                 param.value = parameter.get("value", "")
                 param.value_type = parameter.get("value_type", Parameter.TYPES.STR)
                 param.is_global = parameter.get("is_global", False)
@@ -71,22 +84,39 @@ class Parameter(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.slug:
-            self.slug = slugify(self.name).upper().replace("-", "_")
+            self.slug = parameter_slugify(self.name)
         super().save(*args, **kwargs)
 
+    def get(self):
+        """Return parameter value casted accordingly to its value_type"""
+        functions = {
+            self.TYPES.INT: "int",
+            self.TYPES.STR: "str",
+            self.TYPES.FLT: "float",
+            self.TYPES.DCL: "decimal",
+            self.TYPES.JSN: "json",
+        }
+        function_name = functions[self.value_type]
+        return getattr(self, function_name)()
+
     def int(self):
+        """Return parameter value casted as int()"""
         return int(self.value)
 
     def str(self):
+        """Return parameter value casted as str()"""
         return str(self.value)
 
     def float(self):
+        """Return parameter value casted as float()"""
         return float(self.value)
 
     def decimal(self):
+        """Return parameter value casted as Decimal()"""
         return Decimal(self.value)
 
     def json(self):
+        """Return parameter value casted as dict() using json lib"""
         return json.loads(self.value)
 
     def __str__(self):

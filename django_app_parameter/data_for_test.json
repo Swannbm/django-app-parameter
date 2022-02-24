@@ -1,0 +1,4 @@
+[
+    {"name": "hello ze world", "value": "yes", "description": "123", "is_global": true},
+    {"slug": "A8B8C", "name": "back on test", "value": "yes", "value_type": "INT" }
+]
