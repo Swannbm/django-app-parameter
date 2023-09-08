@@ -6,7 +6,7 @@
 ![black](https://img.shields.io/badge/code%20style-black-000000)
 ![licence](https://img.shields.io/badge/licence-CC0%201.0%20Universal-purple)
 
-App-Parameter is a very simple Django app to save some application's parameters in the database. Those parameters can be updated by users at running (no need to new deployment or any restart). It can be used to store the website's title or default e-mail expeditor...
+App-Parameter is a very simple Django app to save some application's parameters in the database. Those parameters can be updated by users at run time (no need to new deployment or any restart). It can be used to store the website's title or default e-mail expeditor...
 
 ## Install
 
@@ -154,9 +154,10 @@ Enjoy.
 * [x] A migration process to keep a list of your parameters in a file and automatically add them in each environment
 * [x] Shortcut to use Parameter.str(slug) (skip 'objects' key word)
 * [x] Management command to add a new parameter
-* Check correctness of value type on save
-* modifications history
-* Boolean and Datetime types
+* [] Check correctness of value type on save
+* [] modifications history
+* [x] Boolean type
+* [] Datetime types
 
 If you have new idea you would like to see, feel free to open a new issue in this repo.
 

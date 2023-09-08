@@ -40,6 +40,9 @@ class ParameterManager(models.Manager):
     def json(self, slug):
         return self.get_from_slug(slug).json()
 
+    def bool(self, slug):
+        return self.get_from_slug(slug).bool()
+
     def create_or_update(self, parameter, update=True):
         # add slug if not set
         if "slug" not in parameter:
@@ -72,6 +75,7 @@ class Parameter(models.Model):
         FLT = "FLT", "Nombre à virgule (Float)"
         DCL = "DCL", "Nombre à virgule (Decimal)"
         JSN = "JSN", "JSON"
+        BOO = "BOO", "Booléen"
 
     name = models.CharField("Nom", max_length=100)
     slug = models.SlugField(max_length=40, unique=True)
@@ -95,6 +99,7 @@ class Parameter(models.Model):
             self.TYPES.FLT: "float",
             self.TYPES.DCL: "decimal",
             self.TYPES.JSN: "json",
+            self.TYPES.BOO: "bool",
         }
         function_name = functions[self.value_type]
         return getattr(self, function_name)()
@@ -118,6 +123,10 @@ class Parameter(models.Model):
     def json(self):
         """Return parameter value casted as dict() using json lib"""
         return json.loads(self.value)
+
+    def bool(self):
+        """Return parameter value casted as bool()"""
+        return bool(self.value)
 
     def __str__(self):
         return self.name
