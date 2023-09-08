@@ -101,7 +101,7 @@ class Parameter(models.Model):
             self.TYPES.JSN: "json",
             self.TYPES.BOO: "bool",
         }
-        function_name = functions[self.value_type]
+        function_name = functions.get(self.value_type, "str")
         return getattr(self, function_name)()
 
     def int(self):
