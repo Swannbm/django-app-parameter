@@ -126,6 +126,8 @@ class Parameter(models.Model):
 
     def bool(self):
         """Return parameter value casted as bool()"""
+        if not self.value or self.value.lower() in ["false", "0"]:
+            return False
         return bool(self.value)
 
     def __str__(self):

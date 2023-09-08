@@ -121,6 +121,22 @@ class TestParameter:
         )
         assert str(param) == "testing"
 
+    def test_bool(self):
+        param = Parameter(
+            name="testing",
+            slug="TESTING",
+            value="True",
+            value_type=Parameter.TYPES.BOO,
+        )
+        result = param.bool()
+        assert isinstance(result, bool)
+        assert result is True
+        assert isinstance(param.get(), bool)
+        param.value = "False"
+        assert param.bool() is False
+        param.value = "0"
+        assert param.bool() is False
+
 
 @pytest.mark.django_db
 class TestParameterManager:
