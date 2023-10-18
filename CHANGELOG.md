@@ -3,13 +3,14 @@
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 
-## [1.1] - Unreleased
+## [1.1.3] - 2023.10.18
 
 ### Added
 * Boolean type
 
 ### Fixed
 * Avoid exception on incorrect parameter's type
+* Missing migration
 
 ## [0.2.0] - 
 
