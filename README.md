@@ -1,8 +1,7 @@
 # Django-app-parameter
 
 ![Python](https://img.shields.io/badge/python-3.9-yellow)
-![coverage](https://img.shields.io/badge/coverage-100%25-green)
-![version](https://img.shields.io/badge/version-1.0.0-blue)
+![version](https://img.shields.io/badge/version-1.1.3-blue)
 ![black](https://img.shields.io/badge/code%20style-black-000000)
 ![licence](https://img.shields.io/badge/licence-CC0%201.0%20Universal-purple)
 
@@ -72,6 +71,20 @@ class RandomView(TemplateView):
 
 In case you try to read a non existent parameter, an ImproperlyConfigured exception is raised.
 
+### Detailed usage examples for different data types
+
+#### Integer
+
+```python
+from django_app_parameter import app_parameter
+
+try:
+    birth_year = app_parameter.BIRTH_YEAR
+    print(f"Birth year: {birth_year}")
+except ImproperlyConfigured as e:
+    print(f"You need to set BIRTH_YEAR in the app parameters.")
+```
+
 ### Access parameter in templates
 
 You can also access "global" parameters from every templates:
@@ -82,7 +95,7 @@ You can also access "global" parameters from every templates:
 </head>
 ```
 
-A to make a parameter global, you only need to check is_global in admin.
+To make a parameter global, you only need to check is_global in admin.
 
 ### Bulk load parameter with management command
 
