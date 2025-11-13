@@ -139,10 +139,56 @@ poetry install
 
 - ✅ Se concentrer sur **Poetry** (l'outil choisi)
 - ✅ Utiliser `poetry run <command>` (Poetry 2.0+)
-- ✅ Recommander le Makefile pour les raccourcis
+- ✅ Recommander le Makefile **uniquement pour les commandes complexes** (ex: `make check`, `make clean`)
 - ❌ Ne pas documenter pip, virtualenv, conda en alternative
 - ❌ Ne pas expliquer comment installer Poetry/pyenv/etc.
 - ❌ Ne pas utiliser `poetry shell` (non disponible par défaut dans Poetry 2.0+)
+- ❌ Ne pas créer des commandes make qui sont de simples alias d'une seule ligne (ex: `make test` → `poetry run pytest`)
+
+### Makefile : commandes complexes seulement
+
+Le Makefile doit être réservé pour :
+- ✅ Commandes multi-étapes (ex: `make check` qui lance ruff + pyright + tests)
+- ✅ Commandes avec logique complexe (ex: `make clean` avec plusieurs find)
+- ✅ Commandes avec feedback utilisateur (ex: messages avec `@echo`)
+- ❌ PAS pour des alias simples d'une seule commande
+
+**Exemples** :
+
+```makefile
+# ✅ BON : commande complexe avec plusieurs étapes
+check:  ## Vérifier tout avant commit (ruff + pyright + tests)
+	@echo "🔍 Vérification avec Ruff..."
+	poetry run ruff check django_app_parameter/
+	poetry run ruff format --check django_app_parameter/
+	@echo "✅ Ruff OK\n"
+	@echo "🔍 Vérification des types avec Pyright..."
+	poetry run pyright django_app_parameter/
+	@echo "✅ Pyright OK\n"
+	@echo "🔍 Lancement des tests..."
+	poetry run pytest --cov=django_app_parameter --cov-fail-under=100
+	@echo "✅ Tests OK\n"
+	@echo "✅ Toutes les vérifications sont passées !"
+
+# ✅ BON : commande avec logique complexe
+clean:  ## Nettoyer les fichiers temporaires
+	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+	find . -type f -name "*.pyc" -delete
+	find . -type d -name "*.egg-info" -exec rm -rf {} + 2>/dev/null || true
+	# ... plusieurs autres commandes find
+
+# ❌ MAUVAIS : simple alias d'une commande
+test:  ## Lancer les tests
+	poetry run pytest
+
+# ❌ MAUVAIS : simple alias d'une commande
+pyright:  ## Vérifier les types avec pyright
+	poetry run pyright django_app_parameter/
+```
+
+**Dans la documentation, privilégier** :
+- Pour les commandes simples : `poetry run pytest`, `poetry run pyright`, etc.
+- Pour les commandes complexes : `make check`, `make clean`, etc.
 
 ## Structure recommandée de la documentation
 

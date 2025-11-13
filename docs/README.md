@@ -17,12 +17,10 @@ Si vous souhaitez **utiliser** Django App Parameter dans votre projet :
 
 Si vous souhaitez **contribuer** au développement :
 
-7. [Tests](testing.md) - Guide des tests et couverture
+7. [CONTRIBUTING.md](../CONTRIBUTING.md) - Workflow de contribution et guide des tests
 8. [Architecture technique](architecture.md) - Structure interne et design
 9. [Bonnes pratiques](best-practices.md) - Recommandations et patterns
 10. [Guide de publication](publishing.md) - Publier une nouvelle version sur PyPI
-
-Voir aussi [CONTRIBUTING.md](../CONTRIBUTING.md) pour le workflow de contribution.
 
 ## À propos
 

@@ -1,9 +1,10 @@
 # Django-app-parameter
 
-![Python](https://img.shields.io/badge/python-3.9-yellow)
+![Python](https://img.shields.io/badge/python-3.10+-yellow)
 ![coverage](https://img.shields.io/badge/coverage-100%25-green)
-![version](https://img.shields.io/badge/version-1.0.0-blue)
-![black](https://img.shields.io/badge/code%20style-black-000000)
+![version](https://img.shields.io/badge/version-1.1.3-blue)
+![ruff](https://img.shields.io/badge/code%20style-ruff-000000)
+![pyright](https://img.shields.io/badge/type%20checker-pyright-2A6DB2)
 ![licence](https://img.shields.io/badge/licence-CC0%201.0%20Universal-purple)
 
 App-Parameter is a very simple Django app to save some application's parameters in the database. Those parameters can be updated by users at run time (no need to new deployment or any restart). It can be used to store the website's title or default e-mail expeditor...
@@ -161,13 +162,14 @@ Enjoy.
 
 If you have new idea you would like to see, feel free to open a new issue in this repo.
 
-## Help developping
+## Help developing
 
-If you want to participate to the development, there are (only) 2 constraints:
-* Format all your code with black
-* All unit test must pass and new code must be covered
+If you want to participate to the development, there are a few constraints:
+* Format all your code with Ruff
+* Add type hints and verify with Pyright
+* All unit tests must pass and new code must be covered (100% coverage required)
 
-Because tests require a whole django environment, to run them I use https://github.com/Swannbm/runtest_on_dj_packages ; if you know a better way to do it I am all ears :D
+See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed development guidelines.
 
 ## Why Django-App-Parameter
 
