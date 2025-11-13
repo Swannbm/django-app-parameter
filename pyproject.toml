@@ -27,6 +27,7 @@ pytest = "^7.4.0"
 pytest-django = "^4.5.0"
 pytest-cov = "^4.1.0"
 ruff = "^0.8.0"
+pyright = "^1.1.390"
 coverage = {extras = ["toml"], version = "^7.3.0"}
 tox = "^4.6.0"
 
@@ -101,3 +102,22 @@ docstring-code-format = true
 
 [tool.ruff.lint.isort]
 known-first-party = ["django_app_parameter"]
+
+[tool.pyright]
+include = ["django_app_parameter"]
+exclude = [
+    "**/node_modules",
+    "**/__pycache__",
+    "**/migrations",
+    ".tox",
+    ".venv",
+    "dist",
+    "build",
+]
+pythonVersion = "3.10"
+typeCheckingMode = "strict"
+reportMissingImports = true
+reportMissingTypeStubs = false
+reportUnusedImport = true
+reportUnusedVariable = true
+reportDuplicateImport = true
