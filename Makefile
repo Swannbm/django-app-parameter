@@ -16,14 +16,12 @@ test-cov:  ## Lancer les tests avec couverture
 test-all:  ## Lancer les tests avec toutes les versions (tox)
 	tox
 
-lint:  ## Vérifier le code (flake8)
-	poetry run flake8 django_app_parameter/
-
-format:  ## Formater le code (black)
-	poetry run black django_app_parameter/
+ruff:  ## Formater et vérifier le code (ruff)
+	poetry run ruff check --fix django_app_parameter/
+	poetry run ruff format django_app_parameter/
 
 format-check:  ## Vérifier le formatage sans modifier
-	poetry run black --check django_app_parameter/
+	poetry run ruff format --check django_app_parameter/
 
 clean:  ## Nettoyer les fichiers temporaires
 	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
@@ -36,23 +34,15 @@ clean:  ## Nettoyer les fichiers temporaires
 	find . -type d -name "dist" -exec rm -rf {} + 2>/dev/null || true
 	find . -type d -name "build" -exec rm -rf {} + 2>/dev/null || true
 
-build:  ## Construire le package
-	poetry build
-
-publish:  ## Publier sur PyPI (nécessite configuration)
-	poetry publish
-
-check:  ## Vérifier tout avant commit (format, lint, tests)
-	@echo "🔍 Vérification du formatage..."
-	poetry run black --check django_app_parameter/
-	@echo "✅ Formatage OK\n"
-	@echo "🔍 Vérification du linting..."
-	poetry run flake8 django_app_parameter/
-	@echo "✅ Linting OK\n"
+check:  ## Vérifier tout avant commit (ruff + tests)
+	@echo "🔍 Vérification avec Ruff..."
+	poetry run ruff check django_app_parameter/
+	poetry run ruff format --check django_app_parameter/
+	@echo "✅ Ruff OK\n"
 	@echo "🔍 Lancement des tests..."
 	poetry run pytest --cov=django_app_parameter --cov-fail-under=100
 	@echo "✅ Tests OK\n"
 	@echo "✅ Toutes les vérifications sont passées !"
 
-dev:  ## Lancer un environnement de développement interactif
-	poetry shell
+dev:  ## Installer et configurer l'environnement de développement
+	poetry install

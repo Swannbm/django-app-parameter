@@ -22,9 +22,6 @@ cd django-app-parameter
 ```bash
 # Installer les dépendances avec Poetry
 poetry install
-
-# Activer l'environnement virtuel
-poetry shell
 ```
 
 ## Workflow de développement
@@ -41,42 +38,34 @@ git checkout -b fix/correction-bug
 
 Éditez le code dans `django_app_parameter/`
 
-### 3. Formater le code avec Black
+### 3. Formater et vérifier le code avec Ruff
 
 ```bash
-# Formater tous les fichiers
-black django_app_parameter/
+# Avec le Makefile (recommandé)
+make ruff  # Formater et vérifier le code (avec auto-fix)
 
-# Ou avec le Makefile
-make format
+# Ou avec Poetry
+poetry run ruff format django_app_parameter/  # Formater
+poetry run ruff check --fix django_app_parameter/  # Vérifier et corriger
 ```
 
-### 4. Vérifier le linting avec flake8
-
-```bash
-# Vérifier le style du code
-flake8 django_app_parameter/
-
-# Ou avec le Makefile
-make lint
-```
-
-### 5. Écrire des tests
+### 4. Écrire des tests
 
 Tous les nouveaux codes doivent être couverts par des tests. Ajoutez vos tests dans `tests/test_django_app_parameter.py` ou créez un nouveau fichier de test.
 
 ```bash
 # Lancer les tests
-pytest
+poetry run pytest
 
 # Avec couverture
-pytest --cov=django_app_parameter --cov-report=term-missing
+poetry run pytest --cov=django_app_parameter --cov-report=term-missing
 
-# La couverture doit rester à 100%
-pytest --cov=django_app_parameter --cov-report=term-missing --cov-fail-under=100
+# Ou avec le Makefile (recommandé)
+make test
+make test-cov
 ```
 
-### 6. Tester avec plusieurs versions
+### 5. Tester avec plusieurs versions
 
 Avant de soumettre votre PR, testez avec différentes versions de Python et Django :
 
@@ -91,14 +80,14 @@ tox
 tox -e py310-django42
 ```
 
-### 7. Commiter vos changements
+### 6. Commiter vos changements
 
 ```bash
 git add .
 git commit -m "Description claire de vos changements"
 ```
 
-### 8. Pousser et créer une Pull Request
+### 7. Pousser et créer une Pull Request
 
 ```bash
 git push origin feature/ma-nouvelle-fonctionnalite
@@ -110,9 +99,8 @@ Puis créez une Pull Request sur GitHub.
 
 ### Style de code
 
-- **Formatage** : Utilisez Black avec les paramètres par défaut (88 caractères par ligne)
-- **Linting** : Le code doit passer flake8 sans erreurs
-- **Imports** : Organisez les imports dans l'ordre : stdlib, packages tiers, imports locaux
+- **Formatage et linting** : Utilisez Ruff avec les paramètres configurés (88 caractères par ligne)
+- **Imports** : Ruff organise automatiquement les imports dans l'ordre : stdlib, packages tiers, imports locaux
 
 ### Tests
 
@@ -146,9 +134,8 @@ django-app-parameter/
 │   ├── settings.py            # Configuration Django pour tests
 │   └── test_django_app_parameter.py
 ├── docs/                       # Documentation
-├── pyproject.toml             # Configuration Poetry et outils
+├── pyproject.toml             # Configuration Poetry et outils (Ruff, pytest, coverage)
 ├── tox.ini                    # Configuration tox
-├── .flake8                    # Configuration flake8
 ├── README.md
 ├── CHANGELOG.md
 └── CONTRIBUTING.md
@@ -156,14 +143,16 @@ django-app-parameter/
 
 ## Checklist avant de soumettre une PR
 
-- [ ] Le code suit le style Black (lancez `black django_app_parameter/`)
-- [ ] Flake8 ne rapporte aucune erreur (lancez `flake8 django_app_parameter/`)
+- [ ] Le code est formaté avec Ruff (lancez `ruff format django_app_parameter/`)
+- [ ] Ruff ne rapporte aucune erreur (lancez `ruff check django_app_parameter/`)
 - [ ] Tous les tests passent (lancez `pytest`)
 - [ ] La couverture de code est à 100% (lancez `pytest --cov=django_app_parameter --cov-fail-under=100`)
 - [ ] Les tests passent avec tox (au moins une version, idéalement toutes)
 - [ ] La documentation est à jour
 - [ ] Le CHANGELOG est mis à jour
 - [ ] Les commits ont des messages clairs
+
+**Astuce** : Vous pouvez lancer `make check` pour vérifier automatiquement le formatage, le linting et les tests.
 
 ## Types de contributions acceptées
 

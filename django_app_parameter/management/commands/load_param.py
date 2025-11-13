@@ -5,6 +5,7 @@ Arguments:
     --no-update: flag to avoid updating existing parameters
     --json: dict containing a new parameter's values, can't be use with --file
 """
+
 import argparse
 import json
 import logging
@@ -12,7 +13,6 @@ import logging
 from django.core.management.base import BaseCommand
 
 from django_app_parameter.models import Parameter
-
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +43,7 @@ class Command(BaseCommand):
             logger.info("Read file %s", options["file"])
             # required check to be compatible with call_command()
             if isinstance(options["file"], str):
-                options["file"] = open(options["file"], "r")
+                options["file"] = open(options["file"])
             json_data = json.loads(options["file"].read())
             self.load_json(json_data)
         elif "json" in options:

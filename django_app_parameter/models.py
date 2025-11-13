@@ -1,5 +1,4 @@
 import json
-
 from decimal import Decimal
 
 from django.core.exceptions import ImproperlyConfigured
@@ -66,7 +65,6 @@ class ParameterManager(models.Manager):
 
 
 class Parameter(models.Model):
-
     objects = ParameterManager()
 
     class TYPES(models.TextChoices):

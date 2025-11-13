@@ -138,8 +138,11 @@ poetry install
 ### Documentation des outils
 
 - ✅ Se concentrer sur **Poetry** (l'outil choisi)
+- ✅ Utiliser `poetry run <command>` (Poetry 2.0+)
+- ✅ Recommander le Makefile pour les raccourcis
 - ❌ Ne pas documenter pip, virtualenv, conda en alternative
 - ❌ Ne pas expliquer comment installer Poetry/pyenv/etc.
+- ❌ Ne pas utiliser `poetry shell` (non disponible par défaut dans Poetry 2.0+)
 
 ## Structure recommandée de la documentation
 

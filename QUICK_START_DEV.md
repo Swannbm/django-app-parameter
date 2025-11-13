@@ -11,9 +11,6 @@ cd django-app-parameter
 
 # Installer les dépendances avec Poetry
 poetry install
-
-# Activer l'environnement virtuel
-poetry shell
 ```
 
 ## Commandes essentielles

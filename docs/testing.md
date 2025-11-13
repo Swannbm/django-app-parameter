@@ -19,7 +19,6 @@ Le projet utilise **Poetry** pour la gestion des dépendances.
 
 ```bash
 poetry install
-poetry shell
 ```
 
 ## Exécution des tests
@@ -27,20 +26,20 @@ poetry shell
 ### Tests de base
 
 ```bash
-pytest                    # Tous les tests
-pytest -v                 # Verbeux
-pytest tests/test_django_app_parameter.py::TestParameter  # Classe spécifique
+poetry run pytest                    # Tous les tests
+poetry run pytest -v                 # Verbeux
+poetry run pytest tests/test_django_app_parameter.py::TestParameter  # Classe spécifique
 
-make test                 # Raccourci Makefile
+make test                            # Raccourci Makefile (recommandé)
 ```
 
 ### Tests avec couverture
 
 ```bash
-pytest --cov=django_app_parameter --cov-report=term-missing
-pytest --cov=django_app_parameter --cov-report=html
+poetry run pytest --cov=django_app_parameter --cov-report=term-missing
+poetry run pytest --cov=django_app_parameter --cov-report=html
 
-make test-cov             # Raccourci avec rapport HTML
+make test-cov             # Raccourci (recommandé)
 ```
 
 La configuration de couverture est dans [pyproject.toml](../pyproject.toml) (`[tool.coverage.*]`).
@@ -52,14 +51,13 @@ Tox permet de tester avec différentes versions de Python et Django. Configurati
 ```bash
 tox                       # Tous les environnements
 tox -e py310-django42     # Version spécifique
-tox -e lint               # Linting
-tox -e format             # Formater le code
+tox -e ruff               # Formater et vérifier avec Ruff
 tox -e coverage           # Vérifier couverture à 100%
 
 make test-all             # Raccourci
 ```
 
-**Environnements disponibles** : `py{37,38,39,310,311}-django{32,40,41,42}`, `lint`, `format`, `coverage`, `dev`
+**Environnements disponibles** : `py{37,38,39,310,311}-django{32,40,41,42}`, `ruff`, `coverage`, `dev`
 
 ## Workflow de développement
 
@@ -71,8 +69,7 @@ make install              # Installer les dépendances
 make test                 # Lancer les tests
 make test-cov             # Tests avec couverture
 make test-all             # Tests multi-versions (tox)
-make lint                 # Vérifier le code (flake8)
-make format               # Formater le code (black)
+make ruff                 # Formater et vérifier le code (ruff)
 make check                # Tout vérifier avant commit
 make clean                # Nettoyer les fichiers temporaires
 ```
@@ -81,19 +78,18 @@ make clean                # Nettoyer les fichiers temporaires
 
 ```bash
 # 1. Installer
-poetry install && poetry shell
+poetry install
 
 # 2. Développer
 # ... éditer le code ...
 
-# 3. Formater et vérifier
-make format
-make lint
+# 3. Formater et vérifier avec Ruff
+make ruff
 
 # 4. Tester
 make test-cov
 
-# 5. Avant commit
+# 5. Avant commit (tout vérifier)
 make check
 ```
 
