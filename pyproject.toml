@@ -8,21 +8,88 @@ license = "CC0 1.0 Universal"
 readme = "README.md"
 homepage = "https://github.com/Swannbm/django-app-parameter"
 repository = "https://github.com/Swannbm/django-app-parameter"
-documentation = ""
+documentation = "https://github.com/Swannbm/django-app-parameter"
 keywords = [
     "Django",
     "Parameter",
     "Configuration",
 ]
 
-[tool.poetry.dependencies]
-python = "^3.7"
+[tool.poetry.urls]
+"Bug Tracker" = "https://github.com/Swannbm/django-app-parameter/issues"
 
-[tool.poetry.dev-dependencies]
+[tool.poetry.dependencies]
+python = "^3.10"
+Django = ">=3.2"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.4.0"
+pytest-django = "^4.5.0"
+pytest-cov = "^4.1.0"
+black = "^23.0.0"
+flake8 = "^6.0.0"
+coverage = {extras = ["toml"], version = "^7.3.0"}
+tox = "^4.6.0"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
 
-[tool.poetry.urls]
-issues = "https://github.com/hackersandslackers/python-poetry-tutorial/issues"
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "tests.settings"
+python_files = ["tests.py", "test_*.py", "*_tests.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "--strict-markers",
+    "--strict-config",
+    "--verbose",
+    "--tb=short",
+    "--reuse-db",
+]
+testpaths = ["tests"]
+markers = [
+    "django_db: mark test to use Django database",
+]
+
+[tool.coverage.run]
+source = ["django_app_parameter"]
+omit = [
+    "*/migrations/*",
+    "*/tests/*",
+    "*/tests.py",
+    "*/__pycache__/*",
+    "*/virtualenvs/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+]
+precision = 2
+show_missing = true
+skip_covered = false
+
+[tool.black]
+line-length = 88
+target-version = ["py310", "py311", "py312", "py313"]
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+  | migrations
+)/
+'''
