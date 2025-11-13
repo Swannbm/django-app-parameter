@@ -5,9 +5,9 @@ import pytest
 from django.core.exceptions import ImproperlyConfigured
 from django.core.management import call_command
 
-from . import app_parameter
-from .models import Parameter
-from .context_processors import add_global_parameter_context
+from django_app_parameter import app_parameter
+from django_app_parameter.models import Parameter
+from django_app_parameter.context_processors import add_global_parameter_context
 
 
 @pytest.fixture
