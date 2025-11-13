@@ -1,175 +1,132 @@
-# Guide de contribution
+# Contributing Guide
 
-Merci de votre intérêt pour contribuer à Django App Parameter !
+Thank you for your interest in contributing to Django App Parameter!
 
-## Prérequis
+## Prerequisites
 
-- Python 3.10 ou supérieur
+- Python 3.10 or higher
 - Poetry
 - Git
 
-## Configuration de l'environnement de développement
+## Development Environment Setup
 
-### 1. Cloner le dépôt
+See the [QUICK_START_DEV.md](QUICK_START_DEV.md) guide for initial setup and essential commands.
 
-```bash
-git clone https://github.com/Swannbm/django-app-parameter.git
-cd django-app-parameter
-```
+## Checklist Before Submitting a PR
 
-### 2. Installer les dépendances
+- [ ] Code formatted and checked with Ruff (`poetry run ruff format` and `poetry run ruff check`)
+- [ ] Code fully typed with type hints (`poetry run pyright django_app_parameter/`)
+- [ ] All tests pass (`poetry run pytest`)
+- [ ] Code coverage is 100% (`poetry run pytest --cov=django_app_parameter --cov-fail-under=100`)
+- [ ] Tests pass with tox (at least one version, ideally all)
+- [ ] Documentation is up to date
+- [ ] CHANGELOG is updated
+- [ ] Commit messages are clear
 
-```bash
-# Installer les dépendances avec Poetry
-poetry install
-```
+**Tip**: Run `make check` to automatically verify Ruff, Pyright, and tests.
 
-## Workflow de développement
+### Use Tox for complete testing
 
-### 1. Créer une branche
+Before submitting your PR, test with different versions of Python and Django using Tox.
 
-```bash
-git checkout -b feature/ma-nouvelle-fonctionnalite
-# ou
-git checkout -b fix/correction-bug
-```
-
-### 2. Faire vos modifications
-
-Éditez le code dans `django_app_parameter/`
-
-### 3. Formater et vérifier le code avec Ruff
+Tox configuration is in [tox.ini](tox.ini).
 
 ```bash
-# Avec le Makefile (recommandé)
-make ruff  # Formater et vérifier le code (avec auto-fix)
-
-# Ou avec Poetry
-poetry run ruff format django_app_parameter/  # Formater
-poetry run ruff check --fix django_app_parameter/  # Vérifier et corriger
+tox                       # All environments
+tox -e py310-django42     # Specific version
+tox -e ruff               # Format and check with Ruff
+tox -e pyright            # Type check with Pyright
+tox -e coverage           # Check 100% coverage
 ```
 
-### 4. Écrire des tests
+**Available environments**: `py{37,38,39,310,311}-django{32,40,41,42}`, `ruff`, `pyright`, `coverage`, `dev`
 
-Tous les nouveaux codes doivent être couverts par des tests. Ajoutez vos tests dans `tests/test_django_app_parameter.py` ou créez un nouveau fichier de test.
+## Code Standards
 
-```bash
-# Lancer les tests
-poetry run pytest
+### Code Style
 
-# Avec couverture
-poetry run pytest --cov=django_app_parameter --cov-report=term-missing
-
-# Ou avec le Makefile (recommandé)
-make test
-make test-cov
-```
-
-### 5. Tester avec plusieurs versions
-
-Avant de soumettre votre PR, testez avec différentes versions de Python et Django :
-
-```bash
-# Installer tox
-pip install tox
-
-# Lancer tous les tests
-tox
-
-# Ou tester une version spécifique
-tox -e py310-django42
-```
-
-### 6. Commiter vos changements
-
-```bash
-git add .
-git commit -m "Description claire de vos changements"
-```
-
-### 7. Pousser et créer une Pull Request
-
-```bash
-git push origin feature/ma-nouvelle-fonctionnalite
-```
-
-Puis créez une Pull Request sur GitHub.
-
-## Standards de code
-
-### Style de code
-
-- **Formatage et linting** : Utilisez Ruff avec les paramètres configurés (88 caractères par ligne)
-- **Imports** : Ruff organise automatiquement les imports dans l'ordre : stdlib, packages tiers, imports locaux
+- **Formatting and linting**: Use Ruff with configured settings (88 characters per line)
+- **Imports**: Ruff automatically organizes imports in order: stdlib, third-party packages, local imports
+- **Type hints**: Add type annotations to improve verification with Pyright
 
 ### Tests
 
-- **Couverture** : 100% de couverture de code est obligatoire
-- **Isolation** : Chaque test doit être indépendant
-- **Clarté** : Les noms de tests doivent décrire ce qui est testé
-- **Fixtures** : Utilisez des fixtures pytest pour les données de test réutilisables
+- **Coverage**: 100% code coverage is mandatory
+- **Isolation**: Each test must be independent
+- **Clarity**: Test names should describe what is being tested
+- **Fixtures**: Use pytest fixtures for reusable test data
+
+### Testing Configuration
+
+Configuration is in [pyproject.toml](pyproject.toml):
+
+**pytest** (`[tool.pytest.ini_options]`):
+- Searches for tests in `tests/`
+- Options: `--strict-markers`, `--verbose`, `--reuse-db`
+- [tests/settings.py](tests/settings.py) configures:
+  - SQLite in-memory database
+  - Minimal Django applications
+  - Context processor for tests
 
 ### Documentation
 
-- **Docstrings** : Ajoutez des docstrings pour les nouvelles fonctions/classes
-- **README** : Mettez à jour le README si vous ajoutez de nouvelles fonctionnalités
-- **CHANGELOG** : Ajoutez une entrée dans CHANGELOG.md
+- **Docstrings**: Add docstrings for new functions/classes
+- **README**: Update README if adding new features
+- **CHANGELOG**: Add an entry in CHANGELOG.md
 
-## Structure du projet
+## Project Structure
 
 ```
 django-app-parameter/
-├── django_app_parameter/       # Code source
+├── django_app_parameter/       # Source code
 │   ├── __init__.py
-│   ├── models.py              # Modèle Parameter
-│   ├── admin.py               # Interface admin
+│   ├── models.py              # Parameter model
+│   ├── admin.py               # Admin interface
 │   ├── apps.py
-│   ├── context_processors.py  # Context processor pour templates
+│   ├── context_processors.py  # Context processor for templates
 │   ├── management/
 │   │   └── commands/
-│   │       └── load_param.py  # Commande de gestion
+│   │       └── load_param.py  # Management command
 │   └── migrations/
 ├── tests/                      # Tests
 │   ├── __init__.py
-│   ├── settings.py            # Configuration Django pour tests
+│   ├── settings.py            # Django configuration for tests
 │   └── test_django_app_parameter.py
 ├── docs/                       # Documentation
-├── pyproject.toml             # Configuration Poetry et outils (Ruff, pytest, coverage)
-├── tox.ini                    # Configuration tox
+├── pyproject.toml             # Poetry and tools configuration (Ruff, pytest, coverage, Pyright)
+├── tox.ini                    # Tox configuration
+├── Makefile                   # Complex commands shortcuts
 ├── README.md
 ├── CHANGELOG.md
 └── CONTRIBUTING.md
 ```
 
-## Checklist avant de soumettre une PR
+## Types of Accepted Contributions
 
-- [ ] Le code est formaté avec Ruff (lancez `ruff format django_app_parameter/`)
-- [ ] Ruff ne rapporte aucune erreur (lancez `ruff check django_app_parameter/`)
-- [ ] Tous les tests passent (lancez `pytest`)
-- [ ] La couverture de code est à 100% (lancez `pytest --cov=django_app_parameter --cov-fail-under=100`)
-- [ ] Les tests passent avec tox (au moins une version, idéalement toutes)
-- [ ] La documentation est à jour
-- [ ] Le CHANGELOG est mis à jour
-- [ ] Les commits ont des messages clairs
-
-**Astuce** : Vous pouvez lancer `make check` pour vérifier automatiquement le formatage, le linting et les tests.
-
-## Types de contributions acceptées
-
-- 🐛 Corrections de bugs
-- ✨ Nouvelles fonctionnalités
-- 📝 Améliorations de documentation
-- ✅ Ajout de tests
+- 🐛 Bug fixes
+- ✨ New features
+- 📝 Documentation improvements
+- ✅ Test additions
 - ♻️ Refactoring
-- 🎨 Améliorations d'interface (admin)
+- 🎨 Interface improvements (admin)
 
-## Questions ?
+## Resources
 
-Si vous avez des questions, n'hésitez pas à :
-- Ouvrir une issue sur GitHub
-- Consulter la [documentation](docs/)
-- Regarder les PR existantes pour des exemples
+- Test code: [tests/test_django_app_parameter.py](tests/test_django_app_parameter.py)
+- [pytest documentation](https://docs.pytest.org/)
+- [pytest-django documentation](https://pytest-django.readthedocs.io/)
+- [coverage.py documentation](https://coverage.readthedocs.io/)
+- [tox documentation](https://tox.wiki/)
+- [Ruff documentation](https://docs.astral.sh/ruff/)
+- [Pyright documentation](https://microsoft.github.io/pyright/)
 
-## Licence
+## Questions?
 
-En contribuant à ce projet, vous acceptez que vos contributions soient sous la licence CC0 1.0 Universal.
+If you have questions, feel free to:
+- Open an issue on GitHub
+- Consult the [documentation](docs/)
+- Look at existing PRs for examples
+
+## License
+
+By contributing to this project, you agree that your contributions will be licensed under the CC0 1.0 Universal license.
