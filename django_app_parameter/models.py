@@ -5,7 +5,7 @@ from datetime import time as time_type
 from datetime import timedelta
 from decimal import Decimal
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from django.core.exceptions import ImproperlyConfigured, ValidationError
 from django.core.validators import URLValidator, validate_email
@@ -28,6 +28,8 @@ _str = str
 _list = list
 _dict = dict
 _float = float
+_int = int
+_bool = bool
 _datetime = datetime_type
 _time = time_type
 
@@ -234,5 +236,153 @@ class Parameter(models.Model):
             raise ValueError(f"Percentage must be between 0 and 100, got {value}")
         return value
 
+    def set(self, new_value: Any) -> None:
+        """Set parameter value with automatic conversion based on value_type"""
+        functions: _dict[_str, _str] = {
+            self.TYPES.INT: "set_int",
+            self.TYPES.STR: "set_str",
+            self.TYPES.FLT: "set_float",
+            self.TYPES.DCL: "set_decimal",
+            self.TYPES.JSN: "set_json",
+            self.TYPES.BOO: "set_bool",
+            self.TYPES.DATE: "set_date",
+            self.TYPES.DATETIME: "set_datetime",
+            self.TYPES.TIME: "set_time",
+            self.TYPES.URL: "set_url",
+            self.TYPES.EMAIL: "set_email",
+            self.TYPES.LIST: "set_list",
+            self.TYPES.DICT: "set_dict",
+            self.TYPES.PATH: "set_path",
+            self.TYPES.DURATION: "set_duration",
+            self.TYPES.PERCENTAGE: "set_percentage",
+        }
+        function_name = functions.get(self.value_type, "set_str")
+        function = getattr(self, function_name)
+        function(new_value)
+
+    def set_int(self, new_value: Any) -> None:
+        """Set parameter value from int"""
+        if not isinstance(new_value, int):
+            raise TypeError(f"Expected int, got {type(new_value).__name__}")
+        self.value = _str(new_value)
+        self.save()
+
+    def set_str(self, new_value: Any) -> None:
+        """Set parameter value from str"""
+        if not isinstance(new_value, str):
+            raise TypeError(f"Expected str, got {type(new_value).__name__}")
+        self.value = new_value
+        self.save()
+
+    def set_float(self, new_value: Any) -> None:
+        """Set parameter value from float"""
+        if not isinstance(new_value, float):
+            raise TypeError(f"Expected float, got {type(new_value).__name__}")
+        self.value = _str(new_value)
+        self.save()
+
+    def set_decimal(self, new_value: Any) -> None:
+        """Set parameter value from Decimal"""
+        if not isinstance(new_value, Decimal):
+            raise TypeError(f"Expected Decimal, got {type(new_value).__name__}")
+        self.value = _str(new_value)
+        self.save()
+
+    def set_json(self, new_value: Any) -> None:
+        """Set parameter value from JSON-serializable object"""
+        self.value = json.dumps(new_value)
+        self.save()
+
+    def set_bool(self, new_value: Any) -> None:
+        """Set parameter value from bool"""
+        if not isinstance(new_value, bool):
+            raise TypeError(f"Expected bool, got {type(new_value).__name__}")
+        self.value = "1" if new_value else "0"
+        self.save()
+
+    def set_date(self, new_value: Any) -> None:
+        """Set parameter value from date object"""
+        if not isinstance(new_value, date_type):
+            raise TypeError(f"Expected date, got {type(new_value).__name__}")
+        self.value = new_value.isoformat()
+        self.save()
+
+    def set_datetime(self, new_value: Any) -> None:
+        """Set parameter value from datetime object"""
+        if not isinstance(new_value, datetime_type):
+            raise TypeError(f"Expected datetime, got {type(new_value).__name__}")
+        self.value = new_value.isoformat()
+        self.save()
+
+    def set_time(self, new_value: Any) -> None:
+        """Set parameter value from time object"""
+        if not isinstance(new_value, time_type):
+            raise TypeError(f"Expected time, got {type(new_value).__name__}")
+        self.value = new_value.strftime("%H:%M:%S")
+        self.save()
+
+    def set_url(self, new_value: Any) -> None:
+        """Set parameter value from URL string (validates before saving)"""
+        if not isinstance(new_value, str):
+            raise TypeError(f"Expected str, got {type(new_value).__name__}")
+        url_value = new_value.strip()
+        validator = URLValidator()
+        try:
+            validator(url_value)
+        except ValidationError as e:
+            raise ValueError(f"Invalid URL: {url_value}") from e
+        self.value = url_value
+        self.save()
+
+    def set_email(self, new_value: Any) -> None:
+        """Set parameter value from email string (validates before saving)"""
+        if not isinstance(new_value, str):
+            raise TypeError(f"Expected str, got {type(new_value).__name__}")
+        email_value = new_value.strip()
+        try:
+            validate_email(email_value)
+        except ValidationError as e:
+            raise ValueError(f"Invalid email: {email_value}") from e
+        self.value = email_value
+        self.save()
+
+    def set_list(self, new_value: Any) -> None:
+        """Set parameter value from list"""
+        if not isinstance(new_value, list):
+            raise TypeError(f"Expected list, got {type(new_value).__name__}")
+        typed_list = cast(_list[Any], new_value)
+        self.value = ", ".join(str(item) for item in typed_list)
+        self.save()
+
+    def set_dict(self, new_value: Any) -> None:
+        """Set parameter value from dict"""
+        if not isinstance(new_value, dict):
+            raise TypeError(f"Expected dict, got {type(new_value).__name__}")
+        self.value = json.dumps(new_value)
+        self.save()
+
+    def set_path(self, new_value: Any) -> None:
+        """Set parameter value from Path object"""
+        if not isinstance(new_value, Path):
+            raise TypeError(f"Expected Path, got {type(new_value).__name__}")
+        self.value = _str(new_value)
+        self.save()
+
+    def set_duration(self, new_value: Any) -> None:
+        """Set parameter value from timedelta object"""
+        if not isinstance(new_value, timedelta):
+            raise TypeError(f"Expected timedelta, got {type(new_value).__name__}")
+        self.value = _str(new_value.total_seconds())
+        self.save()
+
+    def set_percentage(self, new_value: Any) -> None:
+        """Set parameter value from percentage (validates 0-100)"""
+        if not isinstance(new_value, (float, int)):
+            raise TypeError(f"Expected float or int, got {type(new_value).__name__}")
+        if not 0 <= new_value <= 100:
+            raise ValueError(f"Percentage must be between 0 and 100, got {new_value}")
+        self.value = _str(new_value)
+        self.save()
+
     def __str__(self) -> _str:
-        return str(self.name)
+        return self.name
