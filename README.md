@@ -158,13 +158,8 @@ Enjoy.
 
 ## Ideas which could come later (or not)
 
-* [x] A migration process to keep a list of your parameters in a file and automatically add them in each environment
-* [x] Shortcut to use Parameter.str(slug) (skip 'objects' key word)
-* [x] Management command to add a new parameter
-* [] Check correctness of value type on save
 * [] modifications history
-* [x] Boolean type
-* [] Datetime types
+* [] Enable cyphering
 
 If you have new idea you would like to see, feel free to open a new issue in this repo.
 
@@ -176,6 +171,10 @@ If you want to participate to the development, there are a few constraints:
 * All unit tests must pass and new code must be covered (100% coverage required)
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed development guidelines.
+
+## Release Process
+
+New versions are automatically published to PyPI via GitHub Actions when a version tag is pushed. See [.github/RELEASE.md](.github/RELEASE.md) for detailed release instructions.
 
 ## Why Django-App-Parameter
 
