@@ -12,6 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 * Custom validators support via `DJANGO_APP_PARAMETER['validators']` setting
 * Dynamic validator selection in Django admin with automatic form validation
 * Validator support in `load_param` management command via JSON format (validators in JSON represent the final desired state)
+* dump_param management command to export all parameters to JSON file
 * Demo project for manual testing and development with example custom validators
 * New parameter types:
   * URL (validated URL)
@@ -46,7 +47,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 * Avoid exception on incorrect parameter's type
 * Missing migration
 
-## [0.2.0] - 
+## [0.2.0] -
 
 ### Added
 * Added get method on Parameter with autocasting
