@@ -5,10 +5,23 @@ from datetime import time as time_type
 from datetime import timedelta
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, Callable, cast
 
 from django.core.exceptions import ImproperlyConfigured, ValidationError
-from django.core.validators import URLValidator, validate_email
+from django.core.validators import (
+    EmailValidator,
+    FileExtensionValidator,
+    MaxLengthValidator,
+    MaxValueValidator,
+    MinLengthValidator,
+    MinValueValidator,
+    RegexValidator,
+    URLValidator,
+    validate_email,
+    validate_ipv4_address,
+    validate_ipv6_address,
+    validate_slug,
+)
 from django.db import models
 from django.utils.text import slugify
 
@@ -236,8 +249,20 @@ class Parameter(models.Model):
             raise ValueError(f"Percentage must be between 0 and 100, got {value}")
         return value
 
+    def _run_validators(self, value: Any) -> None:
+        """Run all associated validators on the value"""
+        for param_validator in self.validators.all():  # type: ignore[attr-defined]
+            validator = cast(
+                Callable[[Any], None],
+                param_validator.get_validator(),  # type: ignore[attr-defined]
+            )
+            validator(value)
+
     def set(self, new_value: Any) -> None:
         """Set parameter value with automatic conversion based on value_type"""
+        # Run validators before conversion
+        self._run_validators(new_value)
+
         functions: _dict[_str, _str] = {
             self.TYPES.INT: "set_int",
             self.TYPES.STR: "set_str",
@@ -386,3 +411,85 @@ class Parameter(models.Model):
 
     def __str__(self) -> _str:
         return self.name
+
+
+class ParameterValidator(models.Model):
+    """Stores validator configuration for a Parameter"""
+
+    class VALIDATORS(models.TextChoices):
+        MIN_VALUE = "MinValueValidator", "Valeur minimale"
+        MAX_VALUE = "MaxValueValidator", "Valeur maximale"
+        MIN_LENGTH = "MinLengthValidator", "Longueur minimale"
+        MAX_LENGTH = "MaxLengthValidator", "Longueur maximale"
+        REGEX = "RegexValidator", "Expression régulière"
+        EMAIL = "EmailValidator", "Validation email"
+        URL = "URLValidator", "Validation URL"
+        SLUG = "validate_slug", "Validation slug"
+        IPV4 = "validate_ipv4_address", "Adresse IPv4"
+        IPV6 = "validate_ipv6_address", "Adresse IPv6"
+        FILE_EXTENSION = "FileExtensionValidator", "Extensions de fichier autorisées"
+
+    parameter = models.ForeignKey(
+        Parameter,
+        on_delete=models.CASCADE,
+        related_name="validators",
+        verbose_name="Paramètre",
+    )
+    validator_type = models.CharField(
+        "Type de validateur",
+        max_length=50,
+        choices=VALIDATORS.choices,
+    )
+    validator_params = models.JSONField(  # type: ignore[var-annotated]
+        "Paramètres du validateur",
+        default=dict,
+        blank=True,
+        help_text=(
+            "Paramètres JSON pour instancier le validateur "
+            "(ex: {'limit_value': 100})"
+        ),
+    )
+    order = models.PositiveIntegerField("Ordre", default=0)
+
+    class Meta:
+        ordering = ["order"]
+        verbose_name = "Validateur de paramètre"
+        verbose_name_plural = "Validateurs de paramètre"
+
+    def get_validator(self) -> Callable[[Any], None]:
+        """Instantiate and return the validator based on type and params"""
+        validator_map: _dict[_str, Any] = {
+            self.VALIDATORS.MIN_VALUE: MinValueValidator,
+            self.VALIDATORS.MAX_VALUE: MaxValueValidator,
+            self.VALIDATORS.MIN_LENGTH: MinLengthValidator,
+            self.VALIDATORS.MAX_LENGTH: MaxLengthValidator,
+            self.VALIDATORS.REGEX: RegexValidator,
+            self.VALIDATORS.EMAIL: EmailValidator,
+            self.VALIDATORS.URL: URLValidator,
+            self.VALIDATORS.SLUG: validate_slug,
+            self.VALIDATORS.IPV4: validate_ipv4_address,
+            self.VALIDATORS.IPV6: validate_ipv6_address,
+            self.VALIDATORS.FILE_EXTENSION: FileExtensionValidator,
+        }
+
+        validator_class = validator_map.get(self.validator_type)
+        if validator_class is None:
+            raise ValueError(f"Unknown validator type: {self.validator_type}")
+
+        # Functions like validate_slug don't need instantiation
+        if callable(validator_class) and not isinstance(
+            validator_class, type
+        ):
+            return cast(Callable[[Any], None], validator_class)
+
+        # Class-based validators need instantiation with params
+        params: _dict[_str, Any] = cast(
+            _dict[_str, Any], self.validator_params  # type: ignore[arg-type]
+        )
+        return cast(Callable[[Any], None], validator_class(**params))
+
+    def __str__(self) -> _str:
+        return (
+            f"{self.parameter.name} - "
+            f"{self.get_validator_type_display()}"  # type: ignore[attr-defined]
+        )

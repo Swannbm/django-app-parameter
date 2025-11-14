@@ -9,7 +9,7 @@ from django.core.management import call_command
 
 from django_app_parameter import app_parameter
 from django_app_parameter.context_processors import add_global_parameter_context
-from django_app_parameter.models import Parameter
+from django_app_parameter.models import Parameter, ParameterValidator
 
 
 @pytest.fixture
@@ -431,3 +431,498 @@ class TestContextProcessor:
         context = add_global_parameter_context(None)
         assert len(context) == 1
         assert "BIRTH_YEAR" in context
+
+
+@pytest.mark.django_db
+class TestParameterSetters:
+    """Test all setter methods for Parameter model"""
+
+    def test_set_int(self):
+        param = Parameter.objects.create(
+            name="test_int",
+            value="0",
+            value_type=Parameter.TYPES.INT,
+        )
+        param.set_int(42)
+        param.refresh_from_db()
+        assert param.value == "42"
+        assert param.int() == 42
+
+    def test_set_int_invalid_type(self):
+        param = Parameter.objects.create(
+            name="test_int",
+            value="0",
+            value_type=Parameter.TYPES.INT,
+        )
+        with pytest.raises(TypeError, match="Expected int"):
+            param.set_int("not_an_int")
+
+    def test_set_str(self):
+        param = Parameter.objects.create(
+            name="test_str",
+            value="old",
+            value_type=Parameter.TYPES.STR,
+        )
+        param.set_str("new value")
+        param.refresh_from_db()
+        assert param.value == "new value"
+        assert param.str() == "new value"
+
+    def test_set_str_invalid_type(self):
+        param = Parameter.objects.create(
+            name="test_str",
+            value="old",
+            value_type=Parameter.TYPES.STR,
+        )
+        with pytest.raises(TypeError, match="Expected str"):
+            param.set_str(123)
+
+    def test_set_float(self):
+        param = Parameter.objects.create(
+            name="test_float",
+            value="0.0",
+            value_type=Parameter.TYPES.FLT,
+        )
+        param.set_float(3.14)
+        param.refresh_from_db()
+        assert param.value == "3.14"
+        assert param.float() == 3.14
+
+    def test_set_float_invalid_type(self):
+        param = Parameter.objects.create(
+            name="test_float",
+            value="0.0",
+            value_type=Parameter.TYPES.FLT,
+        )
+        with pytest.raises(TypeError, match="Expected float"):
+            param.set_float("not_a_float")
+
+    def test_set_decimal(self):
+        param = Parameter.objects.create(
+            name="test_decimal",
+            value="0.0",
+            value_type=Parameter.TYPES.DCL,
+        )
+        param.set_decimal(Decimal("99.99"))
+        param.refresh_from_db()
+        assert param.value == "99.99"
+        assert param.decimal() == Decimal("99.99")
+
+    def test_set_bool(self):
+        param = Parameter.objects.create(
+            name="test_bool",
+            value="0",
+            value_type=Parameter.TYPES.BOO,
+        )
+        param.set_bool(True)
+        param.refresh_from_db()
+        assert param.value == "1"
+        assert param.bool() is True
+
+        param.set_bool(False)
+        param.refresh_from_db()
+        assert param.value == "0"
+        assert param.bool() is False
+
+    def test_set_date(self):
+        param = Parameter.objects.create(
+            name="test_date",
+            value="2024-01-01",
+            value_type=Parameter.TYPES.DATE,
+        )
+        new_date = date(2025, 12, 31)
+        param.set_date(new_date)
+        param.refresh_from_db()
+        assert param.value == "2025-12-31"
+        assert param.date() == new_date
+
+    def test_set_datetime(self):
+        param = Parameter.objects.create(
+            name="test_datetime",
+            value="2024-01-01T00:00:00",
+            value_type=Parameter.TYPES.DATETIME,
+        )
+        new_dt = datetime(2025, 12, 31, 23, 59, 59)
+        param.set_datetime(new_dt)
+        param.refresh_from_db()
+        assert param.value == "2025-12-31T23:59:59"
+        assert param.datetime() == new_dt
+
+    def test_set_time(self):
+        param = Parameter.objects.create(
+            name="test_time",
+            value="00:00:00",
+            value_type=Parameter.TYPES.TIME,
+        )
+        new_time = time(14, 30, 45)
+        param.set_time(new_time)
+        param.refresh_from_db()
+        assert param.value == "14:30:45"
+        assert param.time() == new_time
+
+    def test_set_url(self):
+        param = Parameter.objects.create(
+            name="test_url",
+            value="https://old.com",
+            value_type=Parameter.TYPES.URL,
+        )
+        param.set_url("https://new.example.com")
+        param.refresh_from_db()
+        assert param.value == "https://new.example.com"
+        assert param.url() == "https://new.example.com"
+
+    def test_set_url_invalid(self):
+        param = Parameter.objects.create(
+            name="test_url",
+            value="https://old.com",
+            value_type=Parameter.TYPES.URL,
+        )
+        with pytest.raises(ValueError, match="Invalid URL"):
+            param.set_url("not-a-valid-url")
+
+    def test_set_email(self):
+        param = Parameter.objects.create(
+            name="test_email",
+            value="old@example.com",
+            value_type=Parameter.TYPES.EMAIL,
+        )
+        param.set_email("new@example.com")
+        param.refresh_from_db()
+        assert param.value == "new@example.com"
+        assert param.email() == "new@example.com"
+
+    def test_set_email_invalid(self):
+        param = Parameter.objects.create(
+            name="test_email",
+            value="old@example.com",
+            value_type=Parameter.TYPES.EMAIL,
+        )
+        with pytest.raises(ValueError, match="Invalid email"):
+            param.set_email("not-an-email")
+
+    def test_set_list(self):
+        param = Parameter.objects.create(
+            name="test_list",
+            value="a, b, c",
+            value_type=Parameter.TYPES.LIST,
+        )
+        param.set_list(["x", "y", "z"])
+        param.refresh_from_db()
+        assert param.value == "x, y, z"
+        assert param.list() == ["x", "y", "z"]
+
+    def test_set_list_empty(self):
+        param = Parameter.objects.create(
+            name="test_list",
+            value="a, b",
+            value_type=Parameter.TYPES.LIST,
+        )
+        param.set_list([])
+        param.refresh_from_db()
+        assert param.value == ""
+        assert param.list() == []
+
+    def test_set_dict(self):
+        param = Parameter.objects.create(
+            name="test_dict",
+            value='{"old": "value"}',
+            value_type=Parameter.TYPES.DICT,
+        )
+        param.set_dict({"new": "data", "count": 42})
+        param.refresh_from_db()
+        result = param.dict()
+        assert result == {"new": "data", "count": 42}
+
+    def test_set_path(self):
+        param = Parameter.objects.create(
+            name="test_path",
+            value="/old/path",
+            value_type=Parameter.TYPES.PATH,
+        )
+        param.set_path(Path("/new/path/to/file"))
+        param.refresh_from_db()
+        assert param.value == "/new/path/to/file"
+        assert param.path() == Path("/new/path/to/file")
+
+    def test_set_duration(self):
+        param = Parameter.objects.create(
+            name="test_duration",
+            value="3600",
+            value_type=Parameter.TYPES.DURATION,
+        )
+        param.set_duration(timedelta(hours=2))
+        param.refresh_from_db()
+        assert param.value == "7200.0"
+        assert param.duration() == timedelta(hours=2)
+
+    def test_set_percentage(self):
+        param = Parameter.objects.create(
+            name="test_percentage",
+            value="50",
+            value_type=Parameter.TYPES.PERCENTAGE,
+        )
+        param.set_percentage(75.5)
+        param.refresh_from_db()
+        assert param.value == "75.5"
+        assert param.percentage() == 75.5
+
+    def test_set_percentage_invalid_too_high(self):
+        param = Parameter.objects.create(
+            name="test_percentage",
+            value="50",
+            value_type=Parameter.TYPES.PERCENTAGE,
+        )
+        with pytest.raises(ValueError, match="must be between 0 and 100"):
+            param.set_percentage(150)
+
+    def test_set_percentage_invalid_negative(self):
+        param = Parameter.objects.create(
+            name="test_percentage",
+            value="50",
+            value_type=Parameter.TYPES.PERCENTAGE,
+        )
+        with pytest.raises(ValueError, match="must be between 0 and 100"):
+            param.set_percentage(-10)
+
+    def test_set_generic_int(self):
+        """Test generic set() method with INT type"""
+        param = Parameter.objects.create(
+            name="test_generic",
+            value="0",
+            value_type=Parameter.TYPES.INT,
+        )
+        param.set(999)
+        param.refresh_from_db()
+        assert param.int() == 999
+
+    def test_set_generic_str(self):
+        """Test generic set() method with STR type"""
+        param = Parameter.objects.create(
+            name="test_generic",
+            value="old",
+            value_type=Parameter.TYPES.STR,
+        )
+        param.set("new string")
+        param.refresh_from_db()
+        assert param.str() == "new string"
+
+    def test_set_generic_bool(self):
+        """Test generic set() method with BOOL type"""
+        param = Parameter.objects.create(
+            name="test_generic",
+            value="0",
+            value_type=Parameter.TYPES.BOO,
+        )
+        param.set(True)
+        param.refresh_from_db()
+        assert param.bool() is True
+
+    def test_set_json(self):
+        """Test set_json with complex objects"""
+        param = Parameter.objects.create(
+            name="test_json",
+            value="{}",
+            value_type=Parameter.TYPES.JSN,
+        )
+        data = {"users": [{"name": "Alice"}, {"name": "Bob"}], "count": 2}
+        param.set_json(data)
+        param.refresh_from_db()
+        assert param.json() == data
+
+
+@pytest.mark.django_db
+class TestParameterValidator:
+    """Test ParameterValidator model and validation logic"""
+
+    def test_create_validator(self):
+        param = Parameter.objects.create(
+            name="test_age",
+            value="25",
+            value_type=Parameter.TYPES.INT,
+        )
+        validator = ParameterValidator.objects.create(
+            parameter=param,
+            validator_type=ParameterValidator.VALIDATORS.MIN_VALUE,
+            validator_params={"limit_value": 18},
+        )
+        assert validator.parameter == param
+        assert validator.validator_type == "MinValueValidator"
+
+    def test_validator_min_value(self):
+        param = Parameter.objects.create(
+            name="test_age",
+            value="25",
+            value_type=Parameter.TYPES.INT,
+        )
+        ParameterValidator.objects.create(
+            parameter=param,
+            validator_type=ParameterValidator.VALIDATORS.MIN_VALUE,
+            validator_params={"limit_value": 18},
+        )
+        # Should work
+        param.set(30)
+        assert param.int() == 30
+
+        # Should fail
+        from django.core.exceptions import ValidationError
+
+        with pytest.raises(ValidationError):
+            param.set(10)
+
+    def test_validator_max_value(self):
+        param = Parameter.objects.create(
+            name="test_age",
+            value="25",
+            value_type=Parameter.TYPES.INT,
+        )
+        ParameterValidator.objects.create(
+            parameter=param,
+            validator_type=ParameterValidator.VALIDATORS.MAX_VALUE,
+            validator_params={"limit_value": 100},
+        )
+        # Should work
+        param.set(50)
+        assert param.int() == 50
+
+        # Should fail
+        from django.core.exceptions import ValidationError
+
+        with pytest.raises(ValidationError):
+            param.set(150)
+
+    def test_validator_multiple(self):
+        """Test multiple validators on same parameter"""
+        param = Parameter.objects.create(
+            name="test_score",
+            value="50",
+            value_type=Parameter.TYPES.INT,
+        )
+        ParameterValidator.objects.create(
+            parameter=param,
+            validator_type=ParameterValidator.VALIDATORS.MIN_VALUE,
+            validator_params={"limit_value": 0},
+            order=1,
+        )
+        ParameterValidator.objects.create(
+            parameter=param,
+            validator_type=ParameterValidator.VALIDATORS.MAX_VALUE,
+            validator_params={"limit_value": 100},
+            order=2,
+        )
+
+        # Should work
+        param.set(75)
+        assert param.int() == 75
+
+        # Should fail - too low
+        from django.core.exceptions import ValidationError
+
+        with pytest.raises(ValidationError):
+            param.set(-10)
+
+        # Should fail - too high
+        with pytest.raises(ValidationError):
+            param.set(150)
+
+    def test_validator_min_length(self):
+        param = Parameter.objects.create(
+            name="test_username",
+            value="john",
+            value_type=Parameter.TYPES.STR,
+        )
+        ParameterValidator.objects.create(
+            parameter=param,
+            validator_type=ParameterValidator.VALIDATORS.MIN_LENGTH,
+            validator_params={"limit_value": 3},
+        )
+
+        # Should work
+        param.set("alice")
+        assert param.str() == "alice"
+
+        # Should fail
+        from django.core.exceptions import ValidationError
+
+        with pytest.raises(ValidationError):
+            param.set("ab")
+
+    def test_validator_max_length(self):
+        param = Parameter.objects.create(
+            name="test_code",
+            value="ABC",
+            value_type=Parameter.TYPES.STR,
+        )
+        ParameterValidator.objects.create(
+            parameter=param,
+            validator_type=ParameterValidator.VALIDATORS.MAX_LENGTH,
+            validator_params={"limit_value": 10},
+        )
+
+        # Should work
+        param.set("SHORT")
+        assert param.str() == "SHORT"
+
+        # Should fail
+        from django.core.exceptions import ValidationError
+
+        with pytest.raises(ValidationError):
+            param.set("VERYLONGSTRING")
+
+    def test_validator_regex(self):
+        param = Parameter.objects.create(
+            name="test_pattern",
+            value="ABC123",
+            value_type=Parameter.TYPES.STR,
+        )
+        ParameterValidator.objects.create(
+            parameter=param,
+            validator_type=ParameterValidator.VALIDATORS.REGEX,
+            validator_params={"regex": r"^[A-Z]{3}\d{3}$"},
+        )
+
+        # Should work
+        param.set("XYZ789")
+        assert param.str() == "XYZ789"
+
+        # Should fail
+        from django.core.exceptions import ValidationError
+
+        with pytest.raises(ValidationError):
+            param.set("invalid")
+
+    def test_get_validator_instance(self):
+        """Test get_validator() returns correct validator instance"""
+        param = Parameter.objects.create(
+            name="test",
+            value="10",
+            value_type=Parameter.TYPES.INT,
+        )
+        param_validator = ParameterValidator.objects.create(
+            parameter=param,
+            validator_type=ParameterValidator.VALIDATORS.MIN_VALUE,
+            validator_params={"limit_value": 5},
+        )
+
+        validator = param_validator.get_validator()
+        assert callable(validator)
+
+        # Test it works
+        validator(10)  # Should not raise
+
+        from django.core.exceptions import ValidationError
+
+        with pytest.raises(ValidationError):
+            validator(3)  # Should raise
+
+    def test_validator_str_representation(self):
+        param = Parameter.objects.create(
+            name="test_param",
+            value="10",
+            value_type=Parameter.TYPES.INT,
+        )
+        validator = ParameterValidator.objects.create(
+            parameter=param,
+            validator_type=ParameterValidator.VALIDATORS.MIN_VALUE,
+            validator_params={"limit_value": 5},
+        )
+        assert str(validator) == "test_param - Valeur minimale"
