@@ -1,0 +1,132 @@
+[
+    {
+        "name": "Site Title",
+        "value": "My Awesome Website",
+        "description": "The title displayed across the website",
+        "is_global": true,
+        "value_type": "STR",
+        "validators": [
+            {
+                "validator_type": "MinLengthValidator",
+                "validator_params": {"limit_value": 3}
+            },
+            {
+                "validator_type": "MaxLengthValidator",
+                "validator_params": {"limit_value": 100}
+            }
+        ]
+    },
+    {
+        "name": "Contact Email",
+        "value": "contact@example.com",
+        "description": "Default contact email for the website",
+        "is_global": true,
+        "value_type": "STR",
+        "validators": [
+            {
+                "validator_type": "EmailValidator",
+                "validator_params": {}
+            }
+        ]
+    },
+    {
+        "name": "Max Upload Size",
+        "value": "10",
+        "description": "Maximum file upload size in megabytes",
+        "is_global": true,
+        "value_type": "INT",
+        "validators": [
+            {
+                "validator_type": "MinValueValidator",
+                "validator_params": {"limit_value": 1}
+            },
+            {
+                "validator_type": "MaxValueValidator",
+                "validator_params": {"limit_value": 100}
+            }
+        ]
+    },
+    {
+        "name": "Maintenance Mode",
+        "value": "false",
+        "description": "Enable or disable maintenance mode",
+        "is_global": true,
+        "value_type": "BOO"
+    },
+    {
+        "name": "Items per page",
+        "value": "25",
+        "description": "Number of items to display per page",
+        "is_global": false,
+        "value_type": "INT",
+        "validators": [
+            {
+                "validator_type": "MinValueValidator",
+                "validator_params": {"limit_value": 10}
+            },
+            {
+                "validator_type": "MaxValueValidator",
+                "validator_params": {"limit_value": 100}
+            }
+        ]
+    },
+    {
+        "name": "API Endpoint",
+        "value": "https://api.example.com/v1",
+        "description": "External API endpoint URL",
+        "is_global": false,
+        "value_type": "STR",
+        "validators": [
+            {
+                "validator_type": "URLValidator",
+                "validator_params": {}
+            }
+        ]
+    },
+    {
+        "name": "Enable notifications",
+        "value": "true",
+        "description": "Enable email notifications for users",
+        "is_global": false,
+        "value_type": "BOO"
+    },
+    {
+        "name": "Cache timeout",
+        "value": "3600",
+        "description": "Cache timeout in seconds",
+        "is_global": false,
+        "value_type": "INT",
+        "validators": [
+            {
+                "validator_type": "MinValueValidator",
+                "validator_params": {"limit_value": 60}
+            }
+        ]
+    },
+    {
+        "name": "Office Opening Time",
+        "value": "09:00:00",
+        "description": "Business opening time",
+        "is_global": true,
+        "value_type": "TIME",
+        "validators": [
+            {
+                "validator_type": "business_hours",
+                "validator_params": {}
+            }
+        ]
+    },
+    {
+        "name": "Minimum User Age",
+        "value": "18",
+        "description": "Minimum age requirement for users",
+        "is_global": true,
+        "value_type": "INT",
+        "validators": [
+            {
+                "validator_type": "age",
+                "validator_params": {"min_age": 18, "max_age": 120}
+            }
+        ]
+    }
+]

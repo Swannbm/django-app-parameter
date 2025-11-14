@@ -1,9 +1,11 @@
+from typing import Any
+
+from django.http import HttpRequest
+
 from .models import Parameter
 
 
-def add_global_parameter_context(request):
-    params = Parameter.objects.filter(is_global=True)
-    context = dict()
-    for param in params:
-        context[param.slug] = param.str()
-    return context
+def add_global_parameter_context(request: HttpRequest) -> dict[str, Any]:
+    return {
+        param.slug: param.str() for param in Parameter.objects.filter(is_global=True)
+    }

@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ SITE_TITLE }} - Demo</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+        }
+        .parameter {
+            margin: 15px 0;
+            padding: 10px;
+            background-color: #f9f9f9;
+            border-left: 4px solid #4CAF50;
+        }
+        .label {
+            font-weight: bold;
+            color: #666;
+        }
+        .value {
+            color: #333;
+            margin-top: 5px;
+        }
+        .admin-link {
+            display: inline-block;
+            margin-top: 20px;
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+        }
+        .admin-link:hover {
+            background-color: #45a049;
+        }
+        .user-info {
+            background-color: #e8f5e9;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            border-left: 4px solid #4CAF50;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Django App Parameter - Demo</h1>
+
+        {% if user.is_authenticated %}
+        <div class="user-info">
+            <strong>Logged in as:</strong> {{ user.username }}
+            {% if user.is_superuser %}(superuser){% endif %}
+        </div>
+        {% endif %}
+
+        <p>This is a demonstration of the django-app-parameter application.</p>
+
+        <h2>Global Parameters (available in all templates):</h2>
+
+        <div class="parameter">
+            <div class="label">Site Title:</div>
+            <div class="value">{{ SITE_TITLE }}</div>
+        </div>
+
+        <div class="parameter">
+            <div class="label">Contact Email:</div>
+            <div class="value">{{ CONTACT_EMAIL }}</div>
+        </div>
+
+        <div class="parameter">
+            <div class="label">Max Upload Size (MB):</div>
+            <div class="value">{{ MAX_UPLOAD_SIZE }}</div>
+        </div>
+
+        <div class="parameter">
+            <div class="label">Maintenance Mode:</div>
+            <div class="value">{{ MAINTENANCE_MODE }}</div>
+        </div>
+
+        <a href="/admin/" class="admin-link">Go to Admin Interface</a>
+
+        <p style="margin-top: 20px; color: #666;">
+            <small>You can modify these parameters in the admin interface without restarting the server.</small>
+        </p>
+    </div>
+</body>
+</html>
