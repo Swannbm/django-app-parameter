@@ -302,9 +302,7 @@ class TestParameterValidatorForm:
 
     def test_validator_form_clean_validator_type_empty_bypassing_choice_field(self):
         """Test clean_validator_type directly with empty value"""
-        param = Parameter.objects.create(
-            name="Test", slug="TEST", value="10", value_type="INT"
-        )
+        Parameter.objects.create(name="Test", slug="TEST", value="10", value_type="INT")
 
         form = ParameterValidatorForm(
             data={
@@ -324,9 +322,7 @@ class TestParameterValidatorForm:
         """Test clean_validator_type with validator not in available list"""
         settings.DJANGO_APP_PARAMETER = {"validators": {}}
 
-        param = Parameter.objects.create(
-            name="Test", slug="TEST", value="10", value_type="INT"
-        )
+        Parameter.objects.create(name="Test", slug="TEST", value="10", value_type="INT")
 
         form = ParameterValidatorForm(
             data={
@@ -676,7 +672,8 @@ class TestParameterAdminGetForm:
         admin = ParameterAdmin(Parameter, AdminSite())
         request = HttpRequest()
 
-        # Create a parameter with EMAIL type (should hit else branch in _get_field_for_value_type)
+        # Create a parameter with EMAIL type
+        # (should hit else branch in _get_field_for_value_type)
         param = Parameter.objects.create(
             name="Test Email",
             slug="TEST_EMAIL",
@@ -711,7 +708,12 @@ class TestParameterAdminSaveModel:
 
         # Create form with new value
         form = ParameterEditForm(
-            data={"name": "Test", "value": "new_value", "description": "", "is_global": False},
+            data={
+                "name": "Test",
+                "value": "new_value",
+                "description": "",
+                "is_global": False,
+            },
             instance=param,
         )
         assert form.is_valid()
@@ -732,7 +734,9 @@ class TestParameterAdminSaveModel:
         request = HttpRequest()
 
         # Create a new parameter without value
-        param = Parameter(name="New Param", slug="NEW_PARAM", value_type="INT", value="")
+        param = Parameter(
+            name="New Param", slug="NEW_PARAM", value_type="INT", value=""
+        )
 
         form = ParameterCreateForm(
             data={

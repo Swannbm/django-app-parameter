@@ -351,7 +351,7 @@ class TestParameterManager:
 
     def test_manager_bool(self):
         """Test Parameter.objects.bool() manager method"""
-        param = Parameter.objects.create(
+        Parameter.objects.create(
             name="Test Bool",
             slug="TEST_BOOL",
             value="1",
@@ -363,7 +363,7 @@ class TestParameterManager:
 
     def test_manager_date(self):
         """Test Parameter.objects.date() manager method"""
-        param = Parameter.objects.create(
+        Parameter.objects.create(
             name="Test Date",
             slug="TEST_DATE",
             value="2024-01-15",
@@ -375,7 +375,7 @@ class TestParameterManager:
 
     def test_manager_datetime(self):
         """Test Parameter.objects.datetime() manager method"""
-        param = Parameter.objects.create(
+        Parameter.objects.create(
             name="Test DateTime",
             slug="TEST_DATETIME",
             value="2024-01-15T10:30:00",
@@ -387,7 +387,7 @@ class TestParameterManager:
 
     def test_manager_time(self):
         """Test Parameter.objects.time() manager method"""
-        param = Parameter.objects.create(
+        Parameter.objects.create(
             name="Test Time",
             slug="TEST_TIME",
             value="14:30:00",
@@ -399,7 +399,7 @@ class TestParameterManager:
 
     def test_manager_url(self):
         """Test Parameter.objects.url() manager method"""
-        param = Parameter.objects.create(
+        Parameter.objects.create(
             name="Test URL",
             slug="TEST_URL",
             value="https://example.com",
@@ -411,7 +411,7 @@ class TestParameterManager:
 
     def test_manager_email(self):
         """Test Parameter.objects.email() manager method"""
-        param = Parameter.objects.create(
+        Parameter.objects.create(
             name="Test Email",
             slug="TEST_EMAIL",
             value="test@example.com",
@@ -423,7 +423,7 @@ class TestParameterManager:
 
     def test_manager_list(self):
         """Test Parameter.objects.list() manager method"""
-        param = Parameter.objects.create(
+        Parameter.objects.create(
             name="Test List",
             slug="TEST_LIST",
             value="a, b, c",
@@ -435,7 +435,7 @@ class TestParameterManager:
 
     def test_manager_dict(self):
         """Test Parameter.objects.dict() manager method"""
-        param = Parameter.objects.create(
+        Parameter.objects.create(
             name="Test Dict",
             slug="TEST_DICT",
             value='{"key": "value"}',
@@ -447,7 +447,7 @@ class TestParameterManager:
 
     def test_manager_path(self):
         """Test Parameter.objects.path() manager method"""
-        param = Parameter.objects.create(
+        Parameter.objects.create(
             name="Test Path",
             slug="TEST_PATH",
             value="/tmp/test.txt",
@@ -459,7 +459,7 @@ class TestParameterManager:
 
     def test_manager_duration(self):
         """Test Parameter.objects.duration() manager method"""
-        param = Parameter.objects.create(
+        Parameter.objects.create(
             name="Test Duration",
             slug="TEST_DURATION",
             value="3600",
@@ -471,7 +471,7 @@ class TestParameterManager:
 
     def test_manager_percentage(self):
         """Test Parameter.objects.percentage() manager method"""
-        param = Parameter.objects.create(
+        Parameter.objects.create(
             name="Test Percentage",
             slug="TEST_PERCENTAGE",
             value="75.5",

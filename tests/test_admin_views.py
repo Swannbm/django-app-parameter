@@ -3,7 +3,6 @@
 import json
 
 import pytest
-from django.contrib.admin.sites import AdminSite
 from django.contrib.auth.models import User
 from django.test import Client
 from django.urls import reverse
@@ -80,9 +79,7 @@ class TestParameterAdminListView:
         assert response.status_code == 200
         assert "django_app_parameter/parameter" in str(response.context)
 
-    def test_admin_list_view_displays_parameters(
-        self, admin_client, sample_parameter
-    ):
+    def test_admin_list_view_displays_parameters(self, admin_client, sample_parameter):
         """Test that changelist displays existing parameters"""
         url = reverse("admin:django_app_parameter_parameter_changelist")
         response = admin_client.get(url)
@@ -211,9 +208,7 @@ class TestParameterAdminChangeView:
         assert "Test Parameter" in content
         assert "test value" in content
 
-    def test_admin_change_view_readonly_fields(
-        self, admin_client, sample_parameter
-    ):
+    def test_admin_change_view_readonly_fields(self, admin_client, sample_parameter):
         """Test that slug and value_type are readonly in change view"""
         url = reverse(
             "admin:django_app_parameter_parameter_change",
@@ -226,7 +221,9 @@ class TestParameterAdminChangeView:
         # Readonly fields should be displayed but not editable
         assert "TEST_PARAMETER" in content
         # The value_type is displayed as its label, not the code
-        assert ("Chaîne de caractères" in content or "STR" in content or "String" in content)
+        assert (
+            "Chaîne de caractères" in content or "STR" in content or "String" in content
+        )
 
     def test_admin_change_view_update_value(self, admin_client, sample_parameter):
         """Test updating parameter value through admin"""
@@ -254,9 +251,7 @@ class TestParameterAdminChangeView:
 
     def test_admin_change_view_nonexistent_parameter(self, admin_client):
         """Test accessing change view with invalid parameter ID"""
-        url = reverse(
-            "admin:django_app_parameter_parameter_change", args=[99999]
-        )
+        url = reverse("admin:django_app_parameter_parameter_change", args=[99999])
         response = admin_client.get(url)
 
         # Should return 404 or redirect
@@ -294,14 +289,10 @@ class TestParameterAdminDeleteView:
         assert "Are you sure" in content or "confirm" in content.lower()
         assert "Test Parameter" in content
 
-    def test_admin_delete_view_delete_parameter(
-        self, admin_client, sample_parameter
-    ):
+    def test_admin_delete_view_delete_parameter(self, admin_client, sample_parameter):
         """Test deleting a parameter through admin"""
         param_id = sample_parameter.pk
-        url = reverse(
-            "admin:django_app_parameter_parameter_delete", args=[param_id]
-        )
+        url = reverse("admin:django_app_parameter_parameter_delete", args=[param_id])
         data = {"post": "yes"}  # Confirm deletion
         response = admin_client.post(url, data, follow=True)
 
@@ -328,9 +319,7 @@ class TestParameterAdminWithValidators:
             validator_params={"limit_value": 10},
         )
 
-        url = reverse(
-            "admin:django_app_parameter_parameter_change", args=[param.pk]
-        )
+        url = reverse("admin:django_app_parameter_parameter_change", args=[param.pk])
         response = admin_client.get(url)
 
         assert response.status_code == 200
@@ -349,9 +338,7 @@ class TestParameterAdminWithValidators:
         )
 
         # Now edit it to add a validator
-        url = reverse(
-            "admin:django_app_parameter_parameter_change", args=[param.pk]
-        )
+        url = reverse("admin:django_app_parameter_parameter_change", args=[param.pk])
 
         # Simulate adding a validator through inline
         data = {
@@ -407,9 +394,7 @@ class TestParameterAdminIntegerType:
             name="Count", slug="COUNT", value="0", value_type="INT"
         )
 
-        url = reverse(
-            "admin:django_app_parameter_parameter_change", args=[param.pk]
-        )
+        url = reverse("admin:django_app_parameter_parameter_change", args=[param.pk])
         data = {
             "name": "Count",
             "value": "42",
@@ -433,9 +418,7 @@ class TestParameterAdminIntegerType:
             name="Count", slug="COUNT", value="0", value_type="INT"
         )
 
-        url = reverse(
-            "admin:django_app_parameter_parameter_change", args=[param.pk]
-        )
+        url = reverse("admin:django_app_parameter_parameter_change", args=[param.pk])
         data = {
             "name": "Count",
             "value": "not_a_number",
@@ -478,9 +461,7 @@ class TestParameterAdminBooleanType:
             name="Enabled", slug="ENABLED", value="0", value_type="BOO"
         )
 
-        url = reverse(
-            "admin:django_app_parameter_parameter_change", args=[param.pk]
-        )
+        url = reverse("admin:django_app_parameter_parameter_change", args=[param.pk])
         data = {
             "name": "Enabled",
             "value": "on",  # Checkbox checked

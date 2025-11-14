@@ -205,9 +205,7 @@ class TestGetValidatorFromRegistry:
     def test_get_validator_import_error(self, settings):
         """Test get_validator_from_registry with ImportError"""
         settings.DJANGO_APP_PARAMETER = {
-            "validators": {
-                "broken_module": "nonexistent.module.validator_function"
-            }
+            "validators": {"broken_module": "nonexistent.module.validator_function"}
         }
         clear_validator_cache()
 
@@ -217,9 +215,7 @@ class TestGetValidatorFromRegistry:
     def test_get_validator_attribute_error(self, settings):
         """Test get_validator_from_registry with AttributeError"""
         settings.DJANGO_APP_PARAMETER = {
-            "validators": {
-                "broken_attr": "tests.test_validators.nonexistent_function"
-            }
+            "validators": {"broken_attr": "tests.test_validators.nonexistent_function"}
         }
         clear_validator_cache()
 

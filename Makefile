@@ -1,4 +1,4 @@
-.PHONY: help check clean
+.PHONY: help check format clean
 
 help:  ## Afficher cette aide
 	@echo "Commandes disponibles :"
@@ -16,6 +16,12 @@ check:  ## Vérifier tout avant commit (ruff + pyright + tests)
 	poetry run pytest --cov=django_app_parameter --cov-fail-under=100
 	@echo "✅ Tests OK\n"
 	@echo "✅ Toutes les vérifications sont passées !"
+
+format:  ## Formater tout le code avec Ruff
+	@echo "🔧 Formatage du code avec Ruff..."
+	poetry run ruff check --fix .
+	poetry run ruff format .
+	@echo "✅ Formatage terminé !"
 
 clean:  ## Nettoyer les fichiers temporaires
 	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
