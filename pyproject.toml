@@ -20,7 +20,7 @@ keywords = [
 
 [tool.poetry.dependencies]
 python = "^3.10"
-Django = ">=3.2"
+Django = ">=4.2,<6.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.0"
@@ -47,6 +47,9 @@ addopts = [
     "--verbose",
     "--tb=short",
     "--reuse-db",
+    "--cov=django_app_parameter",
+    "--cov-report=term-missing",
+    "--cov-report=html",
 ]
 testpaths = ["tests"]
 markers = [
@@ -57,6 +60,7 @@ markers = [
 source = ["django_app_parameter"]
 omit = [
     "*/migrations/*",
+    "django_app_parameter/migrations/*",
     "*/tests/*",
     "*/tests.py",
     "*/__pycache__/*",

@@ -349,6 +349,138 @@ class TestParameterManager:
         assert Parameter.objects.float("BIRTH_YEAR") == float("1983")
         assert Parameter.objects.json("SM_JSON") == [1, 2, 3]
 
+    def test_manager_bool(self):
+        """Test Parameter.objects.bool() manager method"""
+        param = Parameter.objects.create(
+            name="Test Bool",
+            slug="TEST_BOOL",
+            value="1",
+            value_type=Parameter.TYPES.BOO,
+        )
+        result = Parameter.objects.bool("TEST_BOOL")
+        assert result is True
+        assert isinstance(result, bool)
+
+    def test_manager_date(self):
+        """Test Parameter.objects.date() manager method"""
+        param = Parameter.objects.create(
+            name="Test Date",
+            slug="TEST_DATE",
+            value="2024-01-15",
+            value_type=Parameter.TYPES.DATE,
+        )
+        result = Parameter.objects.date("TEST_DATE")
+        assert result == date(2024, 1, 15)
+        assert isinstance(result, date)
+
+    def test_manager_datetime(self):
+        """Test Parameter.objects.datetime() manager method"""
+        param = Parameter.objects.create(
+            name="Test DateTime",
+            slug="TEST_DATETIME",
+            value="2024-01-15T10:30:00",
+            value_type=Parameter.TYPES.DATETIME,
+        )
+        result = Parameter.objects.datetime("TEST_DATETIME")
+        assert result == datetime(2024, 1, 15, 10, 30, 0)
+        assert isinstance(result, datetime)
+
+    def test_manager_time(self):
+        """Test Parameter.objects.time() manager method"""
+        param = Parameter.objects.create(
+            name="Test Time",
+            slug="TEST_TIME",
+            value="14:30:00",
+            value_type=Parameter.TYPES.TIME,
+        )
+        result = Parameter.objects.time("TEST_TIME")
+        assert result == time(14, 30, 0)
+        assert isinstance(result, time)
+
+    def test_manager_url(self):
+        """Test Parameter.objects.url() manager method"""
+        param = Parameter.objects.create(
+            name="Test URL",
+            slug="TEST_URL",
+            value="https://example.com",
+            value_type=Parameter.TYPES.URL,
+        )
+        result = Parameter.objects.url("TEST_URL")
+        assert result == "https://example.com"
+        assert isinstance(result, str)
+
+    def test_manager_email(self):
+        """Test Parameter.objects.email() manager method"""
+        param = Parameter.objects.create(
+            name="Test Email",
+            slug="TEST_EMAIL",
+            value="test@example.com",
+            value_type=Parameter.TYPES.EMAIL,
+        )
+        result = Parameter.objects.email("TEST_EMAIL")
+        assert result == "test@example.com"
+        assert isinstance(result, str)
+
+    def test_manager_list(self):
+        """Test Parameter.objects.list() manager method"""
+        param = Parameter.objects.create(
+            name="Test List",
+            slug="TEST_LIST",
+            value="a, b, c",
+            value_type=Parameter.TYPES.LIST,
+        )
+        result = Parameter.objects.list("TEST_LIST")
+        assert result == ["a", "b", "c"]
+        assert isinstance(result, list)
+
+    def test_manager_dict(self):
+        """Test Parameter.objects.dict() manager method"""
+        param = Parameter.objects.create(
+            name="Test Dict",
+            slug="TEST_DICT",
+            value='{"key": "value"}',
+            value_type=Parameter.TYPES.DICT,
+        )
+        result = Parameter.objects.dict("TEST_DICT")
+        assert result == {"key": "value"}
+        assert isinstance(result, dict)
+
+    def test_manager_path(self):
+        """Test Parameter.objects.path() manager method"""
+        param = Parameter.objects.create(
+            name="Test Path",
+            slug="TEST_PATH",
+            value="/tmp/test.txt",
+            value_type=Parameter.TYPES.PATH,
+        )
+        result = Parameter.objects.path("TEST_PATH")
+        assert result == Path("/tmp/test.txt")
+        assert isinstance(result, Path)
+
+    def test_manager_duration(self):
+        """Test Parameter.objects.duration() manager method"""
+        param = Parameter.objects.create(
+            name="Test Duration",
+            slug="TEST_DURATION",
+            value="3600",
+            value_type=Parameter.TYPES.DURATION,
+        )
+        result = Parameter.objects.duration("TEST_DURATION")
+        assert result == timedelta(seconds=3600)
+        assert isinstance(result, timedelta)
+
+    def test_manager_percentage(self):
+        """Test Parameter.objects.percentage() manager method"""
+        param = Parameter.objects.create(
+            name="Test Percentage",
+            slug="TEST_PERCENTAGE",
+            value="75.5",
+            value_type=Parameter.TYPES.PERCENTAGE,
+        )
+        result = Parameter.objects.percentage("TEST_PERCENTAGE")
+        assert result == 75.5
+        assert isinstance(result, float)
+
 
 @pytest.mark.django_db
 class TestLoadParamMC:
@@ -1046,6 +1178,126 @@ class TestParameterSetters:
         param.set_json(data)
         param.refresh_from_db()
         assert param.json() == data
+
+    def test_set_decimal_invalid_type(self):
+        """Test set_decimal with invalid type"""
+        param = Parameter.objects.create(
+            name="test_decimal",
+            value="0.0",
+            value_type=Parameter.TYPES.DCL,
+        )
+        with pytest.raises(TypeError, match="Expected Decimal"):
+            param.set_decimal(99.99)  # float instead of Decimal
+
+    def test_set_bool_invalid_type(self):
+        """Test set_bool with invalid type"""
+        param = Parameter.objects.create(
+            name="test_bool",
+            value="0",
+            value_type=Parameter.TYPES.BOO,
+        )
+        with pytest.raises(TypeError, match="Expected bool"):
+            param.set_bool("true")  # string instead of bool
+
+    def test_set_date_invalid_type(self):
+        """Test set_date with invalid type"""
+        param = Parameter.objects.create(
+            name="test_date",
+            value="2024-01-01",
+            value_type=Parameter.TYPES.DATE,
+        )
+        with pytest.raises(TypeError, match="Expected date"):
+            param.set_date("2024-01-01")  # string instead of date
+
+    def test_set_datetime_invalid_type(self):
+        """Test set_datetime with invalid type"""
+        param = Parameter.objects.create(
+            name="test_datetime",
+            value="2024-01-01T00:00:00",
+            value_type=Parameter.TYPES.DATETIME,
+        )
+        with pytest.raises(TypeError, match="Expected datetime"):
+            param.set_datetime("2024-01-01T00:00:00")  # string instead of datetime
+
+    def test_set_time_invalid_type(self):
+        """Test set_time with invalid type"""
+        param = Parameter.objects.create(
+            name="test_time",
+            value="00:00:00",
+            value_type=Parameter.TYPES.TIME,
+        )
+        with pytest.raises(TypeError, match="Expected time"):
+            param.set_time("14:30:00")  # string instead of time
+
+    def test_set_url_invalid_type(self):
+        """Test set_url with invalid type"""
+        param = Parameter.objects.create(
+            name="test_url",
+            value="https://old.com",
+            value_type=Parameter.TYPES.URL,
+        )
+        with pytest.raises(TypeError, match="Expected str"):
+            param.set_url(123)  # int instead of str
+
+    def test_set_email_invalid_type(self):
+        """Test set_email with invalid type"""
+        param = Parameter.objects.create(
+            name="test_email",
+            value="old@example.com",
+            value_type=Parameter.TYPES.EMAIL,
+        )
+        with pytest.raises(TypeError, match="Expected str"):
+            param.set_email(["not", "an", "email"])  # list instead of str
+
+    def test_set_list_invalid_type(self):
+        """Test set_list with invalid type"""
+        param = Parameter.objects.create(
+            name="test_list",
+            value="a, b, c",
+            value_type=Parameter.TYPES.LIST,
+        )
+        with pytest.raises(TypeError, match="Expected list"):
+            param.set_list("a, b, c")  # string instead of list
+
+    def test_set_dict_invalid_type(self):
+        """Test set_dict with invalid type"""
+        param = Parameter.objects.create(
+            name="test_dict",
+            value='{"old": "value"}',
+            value_type=Parameter.TYPES.DICT,
+        )
+        with pytest.raises(TypeError, match="Expected dict"):
+            param.set_dict("not a dict")  # string instead of dict
+
+    def test_set_path_invalid_type(self):
+        """Test set_path with invalid type"""
+        param = Parameter.objects.create(
+            name="test_path",
+            value="/old/path",
+            value_type=Parameter.TYPES.PATH,
+        )
+        with pytest.raises(TypeError, match="Expected Path"):
+            param.set_path("/new/path")  # string instead of Path
+
+    def test_set_duration_invalid_type(self):
+        """Test set_duration with invalid type"""
+        param = Parameter.objects.create(
+            name="test_duration",
+            value="3600",
+            value_type=Parameter.TYPES.DURATION,
+        )
+        with pytest.raises(TypeError, match="Expected timedelta"):
+            param.set_duration(3600)  # int instead of timedelta
+
+    def test_set_percentage_invalid_type(self):
+        """Test set_percentage with invalid type"""
+        param = Parameter.objects.create(
+            name="test_percentage",
+            value="50",
+            value_type=Parameter.TYPES.PERCENTAGE,
+        )
+        with pytest.raises(TypeError, match="Expected float or int"):
+            param.set_percentage("75.5")  # string instead of float/int
 
 
 @pytest.mark.django_db

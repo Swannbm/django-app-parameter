@@ -4,9 +4,39 @@ Thank you for your interest in contributing to Django App Parameter!
 
 ## Prerequisites
 
-- Python 3.10 or higher
+- Python 3.10 or higher (3.10, 3.11, 3.12, or 3.13 recommended)
 - Poetry
 - Git
+
+## Tested Versions
+
+This project is tested against the following Python and Django versions:
+
+| Python  | Django 4.2 LTS | Django 5.2 LTS |
+|---------|----------------|----------------|
+| 3.10    | ✅             | ✅             |
+| 3.11    | ✅             | ✅             |
+| 3.12    | ✅             | ✅             |
+| 3.13    | ✅             | ✅             |
+
+**Support Policy**:
+- We support **LTS versions of Django only** (currently 4.2 and 5.2)
+- We support **Python versions that are not EOL** (currently 3.10+)
+- When a version reaches EOL, it will be removed from our test matrix
+
+**End of Life (EOL) dates**:
+- Python 3.10: October 2026
+- Python 3.11: October 2027
+- Python 3.12: October 2028
+- Python 3.13: October 2029
+- Django 4.2 LTS: April 2026
+- Django 5.2 LTS: April 2028
+
+**Recently dropped support** (for reference):
+- Python 3.9 (EOL: October 2025)
+- Django 3.2 LTS (EOL: April 2024)
+- Django 4.0 (EOL: April 2023)
+- Django 4.1 (EOL: December 2023)
 
 ## Development Environment Setup
 
@@ -32,14 +62,20 @@ Before submitting your PR, test with different versions of Python and Django usi
 Tox configuration is in [tox.ini](tox.ini).
 
 ```bash
-tox                       # All environments
-tox -e py310-django42     # Specific version
+tox                       # All environments (8 Python/Django + 3 linters)
+tox -e py310-django42     # Python 3.10 + Django 4.2 LTS
+tox -e py313-django52     # Python 3.13 + Django 5.2 LTS
 tox -e ruff               # Format and check with Ruff
 tox -e pyright            # Type check with Pyright
 tox -e coverage           # Check 100% coverage
 ```
 
-**Available environments**: `py{37,38,39,310,311}-django{32,40,41,42}`, `ruff`, `pyright`, `coverage`, `dev`
+**Available environments**:
+- **Python/Django matrix**: `py{310,311,312,313}-django{42,52}` (8 combinations)
+- **Quality checks**: `ruff`, `pyright`, `coverage`
+- **Development**: `dev`
+
+**Total**: 11 test environments covering all supported Python and Django LTS versions
 
 ## Code Standards
 

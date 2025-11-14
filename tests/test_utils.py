@@ -202,6 +202,30 @@ class TestGetValidatorFromRegistry:
             validator = get_validator_from_registry(validator_name)
             assert validator is not None
 
+    def test_get_validator_import_error(self, settings):
+        """Test get_validator_from_registry with ImportError"""
+        settings.DJANGO_APP_PARAMETER = {
+            "validators": {
+                "broken_module": "nonexistent.module.validator_function"
+            }
+        }
+        clear_validator_cache()
+
+        with pytest.raises(ImportError, match="Cannot import module"):
+            get_validator_from_registry("broken_module")
+
+    def test_get_validator_attribute_error(self, settings):
+        """Test get_validator_from_registry with AttributeError"""
+        settings.DJANGO_APP_PARAMETER = {
+            "validators": {
+                "broken_attr": "tests.test_validators.nonexistent_function"
+            }
+        }
+        clear_validator_cache()
+
+        with pytest.raises(AttributeError, match="does not have attribute"):
+            get_validator_from_registry("broken_attr")
+
 
 class TestGetAvailableValidators:
     """Tests for get_available_validators utility function"""

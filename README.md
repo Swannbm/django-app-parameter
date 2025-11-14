@@ -1,6 +1,7 @@
 # Django-app-parameter
 
-![Python](https://img.shields.io/badge/python-3.10+-yellow)
+![Python](https://img.shields.io/badge/python-3.10%20|%203.11%20|%203.12%20|%203.13-yellow)
+![Django](https://img.shields.io/badge/django-4.2%20LTS%20|%205.2%20LTS-green)
 ![coverage](https://img.shields.io/badge/coverage-100%25-green)
 ![version](https://img.shields.io/badge/version-1.1.3-blue)
 ![ruff](https://img.shields.io/badge/code%20style-ruff-000000)
@@ -8,6 +9,11 @@
 ![licence](https://img.shields.io/badge/licence-CC0%201.0%20Universal-purple)
 
 App-Parameter is a very simple Django app to save some application's parameters in the database. Those parameters can be updated by users at run time (no need to new deployment or any restart). It can be used to store the website's title or default e-mail expeditor...
+
+## Prerequisites
+
+- **Python 3.10+** (3.10, 3.11, 3.12, or 3.13)
+- **Django 4.2+ LTS** (4.2 LTS or 5.2 LTS)
 
 ## Install
 

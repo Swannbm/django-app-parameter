@@ -310,9 +310,14 @@ class ParameterAdmin(_ModelAdmin):
             return field_class, field_kwargs
 
     def get_form(
-        self, request: HttpRequest, obj: Parameter | None = None, **kwargs: Any
+        self,
+        request: HttpRequest,
+        obj: Parameter | None = None,
+        change: bool = False,
+        **kwargs: Any,
     ) -> type[ModelForm]:
         """Customize form to use appropriate widget based on value_type"""
+        del change  # Unused but required by signature
         # Use simplified form for creation
         if obj is None:
             kwargs["form"] = ParameterCreateForm
@@ -328,7 +333,8 @@ class ParameterAdmin(_ModelAdmin):
             field_class, field_kwargs = self._get_field_for_value_type(
                 obj, field_mapping
             )
-            form_class.base_fields["value"] = field_class(**field_kwargs)
+            # Modify base_fields directly (ModelForm metaclass creates this)
+            form_class.base_fields["value"] = field_class(**field_kwargs)  # type: ignore[attr-defined]
 
         return form_class
 

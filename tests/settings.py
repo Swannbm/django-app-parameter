@@ -14,6 +14,8 @@ INSTALLED_APPS = [
     "django.contrib.contenttypes",
     "django.contrib.auth",
     "django.contrib.admin",
+    "django.contrib.sessions",
+    "django.contrib.messages",
     "django_app_parameter",
 ]
 
@@ -52,6 +54,20 @@ USE_TZ = True
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# URL configuration (required for admin views)
+ROOT_URLCONF = "tests.urls"
+
+# Middleware (required for sessions and admin)
+MIDDLEWARE = [
+    "django.middleware.security.SecurityMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.common.CommonMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django.contrib.messages.middleware.MessageMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
+]
 
 # Disable migrations for faster tests
 # Migrations will be created in memory

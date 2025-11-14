@@ -300,6 +300,48 @@ class TestParameterValidatorForm:
         # Should include custom validator
         assert "even_number" in choice_values
 
+    def test_validator_form_clean_validator_type_empty_bypassing_choice_field(self):
+        """Test clean_validator_type directly with empty value"""
+        param = Parameter.objects.create(
+            name="Test", slug="TEST", value="10", value_type="INT"
+        )
+
+        form = ParameterValidatorForm(
+            data={
+                "validator_type": "MinValueValidator",
+                "validator_params": {"limit_value": 5},
+            }
+        )
+        # Manually set cleaned_data to bypass ChoiceField validation
+        form.is_valid()
+        form.cleaned_data["validator_type"] = ""
+
+        # Now test clean_validator_type directly
+        with pytest.raises(forms.ValidationError, match="sélectionner un validateur"):
+            form.clean_validator_type()
+
+    def test_validator_form_clean_validator_type_not_in_available(self, settings):
+        """Test clean_validator_type with validator not in available list"""
+        settings.DJANGO_APP_PARAMETER = {"validators": {}}
+
+        param = Parameter.objects.create(
+            name="Test", slug="TEST", value="10", value_type="INT"
+        )
+
+        form = ParameterValidatorForm(
+            data={
+                "validator_type": "MinValueValidator",
+                "validator_params": {"limit_value": 5},
+            }
+        )
+        # Manually set cleaned_data with a non-existent validator
+        form.is_valid()
+        form.cleaned_data["validator_type"] = "CompletelyCustomValidator"
+
+        # Now test clean_validator_type directly
+        with pytest.raises(forms.ValidationError, match="non trouvé"):
+            form.clean_validator_type()
+
 
 @pytest.mark.django_db
 class TestParameterAdminHelpers:
@@ -494,3 +536,248 @@ class TestParameterAdminHelpers:
         inlines = admin.get_inlines(request, obj=param)
         # When editing, should have validator inline
         assert len(inlines) == 1
+
+    def test_get_current_value_date(self):
+        """Test _get_current_value with DATE type"""
+        from datetime import date
+
+        admin = ParameterAdmin(Parameter, None)
+        param = Parameter.objects.create(
+            name="Test", slug="TEST", value="2024-01-15", value_type="DAT"
+        )
+
+        current_value = admin._get_current_value(param)
+        assert current_value == date(2024, 1, 15)
+        assert isinstance(current_value, date)
+
+    def test_get_current_value_datetime(self):
+        """Test _get_current_value with DATETIME type"""
+        from datetime import datetime
+
+        admin = ParameterAdmin(Parameter, None)
+        param = Parameter.objects.create(
+            name="Test",
+            slug="TEST",
+            value="2024-01-15T10:30:00",
+            value_type="DTM",
+        )
+
+        current_value = admin._get_current_value(param)
+        assert current_value == datetime(2024, 1, 15, 10, 30, 0)
+        assert isinstance(current_value, datetime)
+
+    def test_get_current_value_time(self):
+        """Test _get_current_value with TIME type"""
+        from datetime import time
+
+        admin = ParameterAdmin(Parameter, None)
+        param = Parameter.objects.create(
+            name="Test", slug="TEST", value="14:30:00", value_type="TIM"
+        )
+
+        current_value = admin._get_current_value(param)
+        assert current_value == time(14, 30, 0)
+        assert isinstance(current_value, time)
+
+    def test_get_current_value_float(self):
+        """Test _get_current_value with FLOAT type"""
+        admin = ParameterAdmin(Parameter, None)
+        param = Parameter.objects.create(
+            name="Test", slug="TEST", value="3.14", value_type="FLT"
+        )
+
+        current_value = admin._get_current_value(param)
+        assert current_value == 3.14
+        assert isinstance(current_value, float)
+
+    def test_get_current_value_decimal(self):
+        """Test _get_current_value with DECIMAL type"""
+        admin = ParameterAdmin(Parameter, None)
+        param = Parameter.objects.create(
+            name="Test", slug="TEST", value="99.99", value_type="DCL"
+        )
+
+        current_value = admin._get_current_value(param)
+        assert current_value == Decimal("99.99")
+        assert isinstance(current_value, Decimal)
+
+    def test_get_current_value_duration(self):
+        """Test _get_current_value with DURATION type"""
+        admin = ParameterAdmin(Parameter, None)
+        param = Parameter.objects.create(
+            name="Test", slug="TEST", value="3600", value_type="DUR"
+        )
+
+        current_value = admin._get_current_value(param)
+        # Returns total_seconds()
+        assert current_value == 3600.0
+        assert isinstance(current_value, float)
+
+    def test_get_current_value_percentage(self):
+        """Test _get_current_value with PERCENTAGE type"""
+        admin = ParameterAdmin(Parameter, None)
+        param = Parameter.objects.create(
+            name="Test", slug="TEST", value="75.5", value_type="PCT"
+        )
+
+        current_value = admin._get_current_value(param)
+        assert current_value == 75.5
+        assert isinstance(current_value, float)
+
+    def test_validator_form_clean_validator_type_invalid(self):
+        """Test clean_validator_type with invalid validator"""
+        form = ParameterValidatorForm(
+            data={
+                "validator_type": "NonExistentValidator",
+                "validator_params": {},
+            }
+        )
+
+        assert not form.is_valid()
+        assert "validator_type" in form.errors
+        # Django's ChoiceField validation message
+        assert "not one of the available choices" in str(form.errors["validator_type"])
+
+    def test_clean_value_no_instance(self):
+        """Test clean_value when instance is None"""
+        form = ParameterEditForm(data={"name": "Test", "value": "test"})
+        # Form needs to be validated first to populate cleaned_data
+        form.is_valid()
+        # Should return value as-is when no instance
+        cleaned_value = form.clean_value()
+        assert cleaned_value == "test"
+
+
+@pytest.mark.django_db
+class TestParameterAdminGetForm:
+    """Tests for ParameterAdmin.get_form method"""
+
+    def test_get_form_creating(self):
+        """Test get_form when creating new parameter"""
+        from django.contrib.admin.sites import AdminSite
+        from django.http import HttpRequest
+
+        admin = ParameterAdmin(Parameter, AdminSite())
+        request = HttpRequest()
+
+        form_class = admin.get_form(request, obj=None)
+
+        # Should use ParameterCreateForm
+        assert form_class._meta.model == Parameter
+        assert "name" in form_class.base_fields
+        assert "slug" in form_class.base_fields
+        assert "value_type" in form_class.base_fields
+
+    def test_get_form_editing_with_else_branch(self):
+        """Test get_form editing with value_type that hits else branch"""
+        from django.contrib.admin.sites import AdminSite
+        from django.http import HttpRequest
+
+        admin = ParameterAdmin(Parameter, AdminSite())
+        request = HttpRequest()
+
+        # Create a parameter with EMAIL type (should hit else branch in _get_field_for_value_type)
+        param = Parameter.objects.create(
+            name="Test Email",
+            slug="TEST_EMAIL",
+            value="test@example.com",
+            value_type="EML",
+        )
+
+        form_class = admin.get_form(request, obj=param, change=True)
+
+        # Should have customized value field
+        assert "value" in form_class.base_fields
+        # EMAIL should use EmailField from mapping
+        assert isinstance(form_class.base_fields["value"], forms.EmailField)
+
+
+@pytest.mark.django_db
+class TestParameterAdminSaveModel:
+    """Tests for ParameterAdmin.save_model method"""
+
+    def test_save_model_update_existing(self):
+        """Test save_model when updating existing parameter"""
+        from django.contrib.admin.sites import AdminSite
+        from django.http import HttpRequest
+
+        admin = ParameterAdmin(Parameter, AdminSite())
+        request = HttpRequest()
+
+        # Use STR type to avoid conversion issues in this test
+        param = Parameter.objects.create(
+            name="Test", slug="TEST", value="old_value", value_type="STR"
+        )
+
+        # Create form with new value
+        form = ParameterEditForm(
+            data={"name": "Test", "value": "new_value", "description": "", "is_global": False},
+            instance=param,
+        )
+        assert form.is_valid()
+
+        # Save using admin's save_model
+        admin.save_model(request, param, form, change=True)
+
+        # Value should be updated
+        param.refresh_from_db()
+        assert param.value == "new_value"
+
+    def test_save_model_create_new_with_defaults(self):
+        """Test save_model when creating new parameter with default values"""
+        from django.contrib.admin.sites import AdminSite
+        from django.http import HttpRequest
+
+        admin = ParameterAdmin(Parameter, AdminSite())
+        request = HttpRequest()
+
+        # Create a new parameter without value
+        param = Parameter(name="New Param", slug="NEW_PARAM", value_type="INT", value="")
+
+        form = ParameterCreateForm(
+            data={
+                "name": "New Param",
+                "slug": "NEW_PARAM",
+                "value_type": "INT",
+                "description": "",
+                "is_global": False,
+            },
+            instance=param,
+        )
+        assert form.is_valid()
+
+        # Save using admin's save_model
+        admin.save_model(request, param, form, change=False)
+
+        # Should have default value
+        param.refresh_from_db()
+        assert param.value == "0"  # Default for INT
+
+    def test_save_model_create_bool_type(self):
+        """Test save_model creates parameter with BOO type default"""
+        from django.contrib.admin.sites import AdminSite
+        from django.http import HttpRequest
+
+        admin = ParameterAdmin(Parameter, AdminSite())
+        request = HttpRequest()
+
+        param = Parameter(
+            name="Bool Param", slug="BOOL_PARAM", value_type="BOO", value=""
+        )
+
+        form = ParameterCreateForm(
+            data={
+                "name": "Bool Param",
+                "slug": "BOOL_PARAM",
+                "value_type": "BOO",
+                "description": "",
+                "is_global": False,
+            },
+            instance=param,
+        )
+        assert form.is_valid()
+
+        admin.save_model(request, param, form, change=False)
+
+        param.refresh_from_db()
+        assert param.value == "0"  # Default for BOO

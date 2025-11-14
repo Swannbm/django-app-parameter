@@ -1,0 +1,20 @@
+[run]
+source = django_app_parameter
+omit =
+    */migrations/*
+    */tests/*
+    */tests.py
+    */__pycache__/*
+    */virtualenvs/*
+
+[report]
+exclude_lines =
+    pragma: no cover
+    def __repr__
+    raise AssertionError
+    raise NotImplementedError
+    if __name__ == .__main__.:
+    if TYPE_CHECKING:
+precision = 2
+show_missing = True
+skip_covered = False

@@ -6,11 +6,14 @@ Arguments:
 
 import json
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
 
 from django.core.management.base import BaseCommand, CommandParser
 
 from django_app_parameter.models import Parameter
+
+if TYPE_CHECKING:
+    from django_app_parameter.models import ParameterManager
 
 logger = logging.getLogger(__name__)
 
@@ -34,11 +37,15 @@ class Command(BaseCommand):
     def handle(self, *args: Any, **options: Any) -> None:
         logger.info("Dump parameter start")
 
-        file_path = options["file"]
-        indent = options["indent"]
+        file_path: str = options["file"]
+        indent: int = options["indent"]
 
         # Get all parameters as JSON
-        data: list[dict[str, Any]] = Parameter.objects.dump_to_json()  # type: ignore[attr-defined]
+        if TYPE_CHECKING:
+            manager = cast("ParameterManager", Parameter.objects)
+            data = manager.dump_to_json()
+        else:
+            data = Parameter.objects.dump_to_json()  # type: ignore[attr-defined]
 
         # Write to file
         logger.info("Writing to file %s", file_path)
