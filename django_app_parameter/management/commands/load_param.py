@@ -13,7 +13,7 @@ from typing import Any
 
 from django.core.management.base import BaseCommand, CommandParser
 
-from django_app_parameter.models import Parameter
+from django_app_parameter.models import Parameter, parameter_slugify
 
 logger = logging.getLogger(__name__)
 
@@ -57,13 +57,13 @@ class Command(BaseCommand):
     def load_json(self, data: Any) -> None:
         logger.info("load json")
         for param_values in data:
-            if self.do_update:
-                logger.info("Updating parameter %s", param_values["slug"])
-                Parameter.objects.update_or_create(
-                    slug=param_values["slug"], defaults=param_values
-                )
+            if "slug" in param_values:
+                slug = param_values["slug"]
             else:
-                logger.info("Adding parameter %s (no update)", param_values["slug"])
-                Parameter.objects.get_or_create(
-                    slug=param_values["slug"], defaults=param_values
-                )
+                slug = parameter_slugify(param_values["name"])
+            if self.do_update:
+                logger.info("Updating parameter %s", slug)
+                Parameter.objects.update_or_create(slug=slug, defaults=param_values)
+            else:
+                logger.info("Adding parameter %s (no update)", slug)
+                Parameter.objects.get_or_create(slug=slug, defaults=param_values)

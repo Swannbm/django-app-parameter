@@ -1,0 +1,104 @@
+{% extends "admin/change_form.html" %}
+{% load static %}
+
+{% block after_field_sets %}
+{{ block.super }}
+
+{% if original %}
+<div class="module">
+    <h2>Validator Help</h2>
+    <div class="help">
+        <p><strong>How to configure validators:</strong></p>
+        <p>Enter the validator parameters in JSON format in the "Validator params" field. Here are examples for each validator type:</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Validator Type</th>
+                    <th>Description</th>
+                    <th>JSON Parameters Example</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><code>MinValueValidator</code></td>
+                    <td>Validates that the value is greater than or equal to a minimum</td>
+                    <td><code>{"limit_value": 10}</code></td>
+                </tr>
+                <tr class="row2">
+                    <td><code>MaxValueValidator</code></td>
+                    <td>Validates that the value is less than or equal to a maximum</td>
+                    <td><code>{"limit_value": 100}</code></td>
+                </tr>
+                <tr>
+                    <td><code>MinLengthValidator</code></td>
+                    <td>Validates that the string length is at least a minimum</td>
+                    <td><code>{"limit_value": 5}</code></td>
+                </tr>
+                <tr class="row2">
+                    <td><code>MaxLengthValidator</code></td>
+                    <td>Validates that the string length does not exceed a maximum</td>
+                    <td><code>{"limit_value": 255}</code></td>
+                </tr>
+                <tr>
+                    <td><code>RegexValidator</code></td>
+                    <td>Validates that the value matches a regular expression pattern</td>
+                    <td><code>{"regex": "^[A-Z][0-9]{3}$", "message": "..."}</code></td>
+                </tr>
+                <tr class="row2">
+                    <td><code>EmailValidator</code></td>
+                    <td>Validates email address format</td>
+                    <td><code>{}</code> (no parameters needed)</td>
+                </tr>
+                <tr>
+                    <td><code>URLValidator</code></td>
+                    <td>Validates URL format</td>
+                    <td><code>{}</code> or <code>{"schemes": ["http", "https"]}</code></td>
+                </tr>
+                <tr class="row2">
+                    <td><code>validate_slug</code></td>
+                    <td>Validates slug format (letters, numbers, hyphens, underscores)</td>
+                    <td><code>{}</code> (no parameters needed)</td>
+                </tr>
+                <tr>
+                    <td><code>validate_ipv4_address</code></td>
+                    <td>Validates IPv4 address format</td>
+                    <td><code>{}</code> (no parameters needed)</td>
+                </tr>
+                <tr class="row2">
+                    <td><code>validate_ipv6_address</code></td>
+                    <td>Validates IPv6 address format</td>
+                    <td><code>{}</code> (no parameters needed)</td>
+                </tr>
+                <tr>
+                    <td><code>FileExtensionValidator</code></td>
+                    <td>Validates file extensions in file paths</td>
+                    <td><code>{"allowed_extensions": ["jpg", "png", "pdf"]}</code></td>
+                </tr>
+            </tbody>
+        </table>
+
+        <fieldset class="module aligned">
+            <h3>💡 Tips</h3>
+            <ul>
+                <li>The "Order" field determines the execution sequence (lowest first)</li>
+                <li>Multiple validators can be applied to the same parameter</li>
+                <li>Validators are executed when saving the parameter value</li>
+                <li>For validators without parameters, use an empty JSON object: <code>{}</code></li>
+                <li>All JSON parameters must use double quotes, not single quotes</li>
+            </ul>
+        </fieldset>
+
+        <fieldset class="module aligned">
+            <h3>📖 Common Use Cases</h3>
+            <ul>
+                <li><strong>Age restriction:</strong> MinValueValidator with <code>{"limit_value": 18}</code> and MaxValueValidator with <code>{"limit_value": 120}</code></li>
+                <li><strong>Percentage validation:</strong> MinValueValidator <code>{"limit_value": 0}</code> + MaxValueValidator <code>{"limit_value": 100}</code></li>
+                <li><strong>Username format:</strong> RegexValidator with <code>{"regex": "^[a-z0-9_]{3,20}$"}</code></li>
+                <li><strong>Password strength:</strong> MinLengthValidator <code>{"limit_value": 8}</code> + RegexValidator for complexity</li>
+            </ul>
+        </fieldset>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

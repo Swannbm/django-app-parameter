@@ -5,7 +5,7 @@ from datetime import time as time_type
 from datetime import timedelta
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Callable, cast
+from typing import Any, Callable, cast  # noqa: UP035
 
 from django.core.exceptions import ImproperlyConfigured, ValidationError
 from django.core.validators import (
@@ -114,9 +114,9 @@ class Parameter(models.Model):
         DCL = "DCL", "Nombre à virgule (Decimal)"
         JSN = "JSN", "JSON"
         BOO = "BOO", "Booléen"
-        DATE = "DATE", "Date (YYYY-MM-DD)"
+        DATE = "DAT", "Date (YYYY-MM-DD)"
         DATETIME = "DTM", "Date et heure (ISO 8601)"
-        TIME = "TIME", "Heure (HH:MM:SS)"
+        TIME = "TIM", "Heure (HH:MM:SS)"
         URL = "URL", "URL validée"
         EMAIL = "EML", "Email validé"
         LIST = "LST", "Liste (séparée par virgules)"
