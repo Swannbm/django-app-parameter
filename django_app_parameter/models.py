@@ -8,20 +8,7 @@ from pathlib import Path
 from typing import Any, Callable, cast  # noqa: UP035
 
 from django.core.exceptions import ImproperlyConfigured, ValidationError
-from django.core.validators import (
-    EmailValidator,
-    FileExtensionValidator,
-    MaxLengthValidator,
-    MaxValueValidator,
-    MinLengthValidator,
-    MinValueValidator,
-    RegexValidator,
-    URLValidator,
-    validate_email,
-    validate_ipv4_address,
-    validate_ipv6_address,
-    validate_slug,
-)
+from django.core.validators import URLValidator, validate_email
 from django.db import models
 from django.utils.text import slugify
 
@@ -416,19 +403,6 @@ class Parameter(models.Model):
 class ParameterValidator(models.Model):
     """Stores validator configuration for a Parameter"""
 
-    class VALIDATORS(models.TextChoices):
-        MIN_VALUE = "MinValueValidator", "Valeur minimale"
-        MAX_VALUE = "MaxValueValidator", "Valeur maximale"
-        MIN_LENGTH = "MinLengthValidator", "Longueur minimale"
-        MAX_LENGTH = "MaxLengthValidator", "Longueur maximale"
-        REGEX = "RegexValidator", "Expression régulière"
-        EMAIL = "EmailValidator", "Validation email"
-        URL = "URLValidator", "Validation URL"
-        SLUG = "validate_slug", "Validation slug"
-        IPV4 = "validate_ipv4_address", "Adresse IPv4"
-        IPV6 = "validate_ipv6_address", "Adresse IPv6"
-        FILE_EXTENSION = "FileExtensionValidator", "Extensions de fichier autorisées"
-
     parameter = models.ForeignKey(
         Parameter,
         on_delete=models.CASCADE,
@@ -437,8 +411,11 @@ class ParameterValidator(models.Model):
     )
     validator_type = models.CharField(
         "Type de validateur",
-        max_length=50,
-        choices=VALIDATORS.choices,
+        max_length=400,
+        help_text=(
+            "Nom du validateur Django intégré ou clé du validateur "
+            "custom défini dans DJANGO_APP_PARAMETER['validators']"
+        ),
     )
     validator_params = models.JSONField(  # type: ignore[var-annotated]
         "Paramètres du validateur",
@@ -449,37 +426,38 @@ class ParameterValidator(models.Model):
             "(ex: {'limit_value': 100})"
         ),
     )
-    order = models.PositiveIntegerField("Ordre", default=0)
 
     class Meta:
-        ordering = ["order"]
         verbose_name = "Validateur de paramètre"
         verbose_name_plural = "Validateurs de paramètre"
 
     def get_validator(self) -> Callable[[Any], None]:
-        """Instantiate and return the validator based on type and params"""
-        validator_map: _dict[_str, Any] = {
-            self.VALIDATORS.MIN_VALUE: MinValueValidator,
-            self.VALIDATORS.MAX_VALUE: MaxValueValidator,
-            self.VALIDATORS.MIN_LENGTH: MinLengthValidator,
-            self.VALIDATORS.MAX_LENGTH: MaxLengthValidator,
-            self.VALIDATORS.REGEX: RegexValidator,
-            self.VALIDATORS.EMAIL: EmailValidator,
-            self.VALIDATORS.URL: URLValidator,
-            self.VALIDATORS.SLUG: validate_slug,
-            self.VALIDATORS.IPV4: validate_ipv4_address,
-            self.VALIDATORS.IPV6: validate_ipv6_address,
-            self.VALIDATORS.FILE_EXTENSION: FileExtensionValidator,
-        }
+        """
+        Instantiate and return the validator based on type and params.
 
-        validator_class = validator_map.get(self.validator_type)
+        Supports both built-in Django validators and custom validators
+        defined in DJANGO_APP_PARAMETER['validators'] setting.
+
+        Returns:
+            Callable validator function or instance
+
+        Raises:
+            ValueError: If validator_type is not found in built-in or custom validators
+        """
+        # Import here to avoid circular imports (utils.py uses Django validators)
+        from django_app_parameter.utils import get_validator_from_registry
+
+        # Get validator class/function from registry (built-in or custom)
+        validator_class = get_validator_from_registry(self.validator_type)
+
         if validator_class is None:
-            raise ValueError(f"Unknown validator type: {self.validator_type}")
+            raise ValueError(
+                f"Unknown validator type: {self.validator_type}. "
+                f"Check DJANGO_APP_PARAMETER['validators'] setting."
+            )
 
         # Functions like validate_slug don't need instantiation
-        if callable(validator_class) and not isinstance(
-            validator_class, type
-        ):
+        if callable(validator_class) and not isinstance(validator_class, type):
             return cast(Callable[[Any], None], validator_class)
 
         # Class-based validators need instantiation with params
@@ -489,7 +467,9 @@ class ParameterValidator(models.Model):
         return cast(Callable[[Any], None], validator_class(**params))
 
     def __str__(self) -> _str:
-        return (
-            f"{self.parameter.name} - "
-            f"{self.get_validator_type_display()}"  # type: ignore[attr-defined]
-        )
+        # Import here to avoid circular imports (utils.py uses Django validators)
+        from django_app_parameter.utils import get_available_validators
+
+        available = get_available_validators()
+        display_name = available.get(self.validator_type, self.validator_type)
+        return f"{self.parameter.name} - {display_name}"

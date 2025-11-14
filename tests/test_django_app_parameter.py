@@ -413,6 +413,322 @@ class TestLoadParamMC:
         assert app_parameter.CREATED == "true"
 
 
+@pytest.fixture
+def custom_validators_settings(settings):
+    """Configure custom validators for tests"""
+    settings.DJANGO_APP_PARAMETER = {
+        "validators": {
+            "even_number": "tests.test_validators.validate_even_number",
+            "custom_range": "tests.test_validators.CustomRangeValidator",
+            "positive": "tests.test_validators.validate_positive",
+        }
+    }
+
+
+@pytest.mark.django_db
+class TestLoadParamWithValidators:
+    """Test load_param management command with validators"""
+
+    def test_load_param_with_single_validator(self):
+        """Test loading a parameter with a single validator"""
+        data = json.dumps(
+            [
+                {
+                    "name": "Max Items",
+                    "value": "50",
+                    "value_type": Parameter.TYPES.INT,
+                    "validators": [
+                        {
+                            "validator_type": "MinValueValidator",
+                            "validator_params": {"limit_value": 10},
+                        }
+                    ],
+                }
+            ]
+        )
+        call_command("load_param", json=data)
+
+        param = Parameter.objects.get(slug="MAX_ITEMS")
+        assert param.validators.count() == 1
+
+        validator = param.validators.first()
+        assert validator.validator_type == "MinValueValidator"
+        assert validator.validator_params == {"limit_value": 10}
+
+    def test_load_param_with_multiple_validators(self):
+        """Test loading a parameter with multiple validators"""
+        data = json.dumps(
+            [
+                {
+                    "name": "User Age",
+                    "value": "25",
+                    "value_type": Parameter.TYPES.INT,
+                    "validators": [
+                        {
+                            "validator_type": "MinValueValidator",
+                            "validator_params": {"limit_value": 18},
+                        },
+                        {
+                            "validator_type": "MaxValueValidator",
+                            "validator_params": {"limit_value": 120},
+                        },
+                    ],
+                }
+            ]
+        )
+        call_command("load_param", json=data)
+
+        param = Parameter.objects.get(slug="USER_AGE")
+        assert param.validators.count() == 2
+
+        validator_types = list(
+            param.validators.values_list("validator_type", flat=True)
+        )
+        assert "MinValueValidator" in validator_types
+        assert "MaxValueValidator" in validator_types
+
+    def test_load_param_with_custom_validator(self, custom_validators_settings):
+        """Test loading a parameter with a custom validator from settings"""
+        data = json.dumps(
+            [
+                {
+                    "name": "Even Number",
+                    "value": "10",
+                    "value_type": Parameter.TYPES.INT,
+                    "validators": [
+                        {
+                            "validator_type": "even_number",
+                            "validator_params": {},
+                        }
+                    ],
+                }
+            ]
+        )
+        call_command("load_param", json=data)
+
+        param = Parameter.objects.get(slug="EVEN_NUMBER")
+        assert param.validators.count() == 1
+
+        validator = param.validators.first()
+        assert validator.validator_type == "even_number"
+
+        # Test that the validator actually works
+        validator_func = validator.get_validator()
+        validator_func(10)  # Should pass
+        with pytest.raises(Exception):
+            validator_func(11)  # Should fail
+
+    def test_load_param_without_validators(self):
+        """Test loading a parameter without validators (backwards compatibility)"""
+        data = json.dumps(
+            [
+                {
+                    "name": "Simple Param",
+                    "value": "test",
+                    "value_type": Parameter.TYPES.STR,
+                }
+            ]
+        )
+        call_command("load_param", json=data)
+
+        param = Parameter.objects.get(slug="SIMPLE_PARAM")
+        assert param.validators.count() == 0
+
+    def test_load_param_with_empty_validators_list(self):
+        """Test loading a parameter with an empty validators list"""
+        data = json.dumps(
+            [
+                {
+                    "name": "Empty Validators",
+                    "value": "test",
+                    "value_type": Parameter.TYPES.STR,
+                    "validators": [],
+                }
+            ]
+        )
+        call_command("load_param", json=data)
+
+        param = Parameter.objects.get(slug="EMPTY_VALIDATORS")
+        assert param.validators.count() == 0
+
+    def test_load_param_replaces_validators(self):
+        """Test that validators are replaced (not updated) when parameter is reloaded"""
+        # First load with two validators
+        data1 = json.dumps(
+            [
+                {
+                    "name": "Max Size",
+                    "value": "100",
+                    "value_type": Parameter.TYPES.INT,
+                    "validators": [
+                        {
+                            "validator_type": "MinValueValidator",
+                            "validator_params": {"limit_value": 10},
+                        },
+                        {
+                            "validator_type": "MaxValueValidator",
+                            "validator_params": {"limit_value": 100},
+                        }
+                    ],
+                }
+            ]
+        )
+        call_command("load_param", json=data1)
+
+        param = Parameter.objects.get(slug="MAX_SIZE")
+        assert param.validators.count() == 2
+
+        # Second load with different validator (should replace all)
+        data2 = json.dumps(
+            [
+                {
+                    "name": "Max Size",
+                    "value": "200",
+                    "value_type": Parameter.TYPES.INT,
+                    "validators": [
+                        {
+                            "validator_type": "MaxValueValidator",
+                            "validator_params": {"limit_value": 200},
+                        }
+                    ],
+                }
+            ]
+        )
+        call_command("load_param", json=data2)
+
+        param.refresh_from_db()
+        # Should have only the new validator
+        assert param.validators.count() == 1
+        validator = param.validators.first()
+        assert validator.validator_type == "MaxValueValidator"
+        assert validator.validator_params == {"limit_value": 200}
+
+    def test_load_param_removes_validators_when_not_in_json(self):
+        """Test that validators are removed if not present in JSON"""
+        # First load with validators
+        data1 = json.dumps(
+            [
+                {
+                    "name": "With Validators",
+                    "value": "50",
+                    "value_type": Parameter.TYPES.INT,
+                    "validators": [
+                        {
+                            "validator_type": "MinValueValidator",
+                            "validator_params": {"limit_value": 10},
+                        }
+                    ],
+                }
+            ]
+        )
+        call_command("load_param", json=data1)
+
+        param = Parameter.objects.get(slug="WITH_VALIDATORS")
+        assert param.validators.count() == 1
+
+        # Second load without validators - should remove them
+        data2 = json.dumps(
+            [
+                {
+                    "name": "With Validators",
+                    "value": "100",
+                    "value_type": Parameter.TYPES.INT,
+                }
+            ]
+        )
+        call_command("load_param", json=data2)
+
+        param.refresh_from_db()
+        # Validators should be removed
+        assert param.validators.count() == 0
+
+    def test_load_param_validator_without_params(self):
+        """Test loading a validator with no parameters (empty dict)"""
+        data = json.dumps(
+            [
+                {
+                    "name": "Email Field",
+                    "value": "test@example.com",
+                    "value_type": Parameter.TYPES.STR,
+                    "validators": [
+                        {
+                            "validator_type": "EmailValidator",
+                            "validator_params": {},
+                        }
+                    ],
+                }
+            ]
+        )
+        call_command("load_param", json=data)
+
+        param = Parameter.objects.get(slug="EMAIL_FIELD")
+        assert param.validators.count() == 1
+
+        validator = param.validators.first()
+        assert validator.validator_type == "EmailValidator"
+        assert validator.validator_params == {}
+
+    def test_load_param_skip_validator_without_type(self):
+        """Test that validators without validator_type are skipped"""
+        data = json.dumps(
+            [
+                {
+                    "name": "Bad Validator",
+                    "value": "50",
+                    "value_type": Parameter.TYPES.INT,
+                    "validators": [
+                        {
+                            "validator_params": {"limit_value": 10},
+                        }
+                    ],
+                }
+            ]
+        )
+        call_command("load_param", json=data)
+
+        param = Parameter.objects.get(slug="BAD_VALIDATOR")
+        # Should create parameter but skip invalid validator
+        assert param.validators.count() == 0
+
+    def test_load_param_add_validators_to_existing_param(self):
+        """Test adding validators to an existing parameter that had none"""
+        # First create parameter without validators
+        data1 = json.dumps(
+            [
+                {
+                    "name": "Growing Param",
+                    "value": "100",
+                    "value_type": Parameter.TYPES.INT,
+                }
+            ]
+        )
+        call_command("load_param", json=data1)
+
+        param = Parameter.objects.get(slug="GROWING_PARAM")
+        assert param.validators.count() == 0
+
+        # Second load adds validators
+        data2 = json.dumps(
+            [
+                {
+                    "name": "Growing Param",
+                    "value": "100",
+                    "value_type": Parameter.TYPES.INT,
+                    "validators": [
+                        {
+                            "validator_type": "MinValueValidator",
+                            "validator_params": {"limit_value": 50},
+                        }
+                    ],
+                }
+            ]
+        )
+        call_command("load_param", json=data2)
+
+        param.refresh_from_db()
+        assert param.validators.count() == 1
+
+
 @pytest.mark.django_db
 class Test_app_parameter:
     def test_read_param(self, params):
@@ -742,7 +1058,7 @@ class TestParameterValidator:
         )
         validator = ParameterValidator.objects.create(
             parameter=param,
-            validator_type=ParameterValidator.VALIDATORS.MIN_VALUE,
+            validator_type="MinValueValidator",
             validator_params={"limit_value": 18},
         )
         assert validator.parameter == param
@@ -756,7 +1072,7 @@ class TestParameterValidator:
         )
         ParameterValidator.objects.create(
             parameter=param,
-            validator_type=ParameterValidator.VALIDATORS.MIN_VALUE,
+            validator_type="MinValueValidator",
             validator_params={"limit_value": 18},
         )
         # Should work
@@ -777,7 +1093,7 @@ class TestParameterValidator:
         )
         ParameterValidator.objects.create(
             parameter=param,
-            validator_type=ParameterValidator.VALIDATORS.MAX_VALUE,
+            validator_type="MaxValueValidator",
             validator_params={"limit_value": 100},
         )
         # Should work
@@ -799,15 +1115,13 @@ class TestParameterValidator:
         )
         ParameterValidator.objects.create(
             parameter=param,
-            validator_type=ParameterValidator.VALIDATORS.MIN_VALUE,
+            validator_type="MinValueValidator",
             validator_params={"limit_value": 0},
-            order=1,
         )
         ParameterValidator.objects.create(
             parameter=param,
-            validator_type=ParameterValidator.VALIDATORS.MAX_VALUE,
+            validator_type="MaxValueValidator",
             validator_params={"limit_value": 100},
-            order=2,
         )
 
         # Should work
@@ -832,7 +1146,7 @@ class TestParameterValidator:
         )
         ParameterValidator.objects.create(
             parameter=param,
-            validator_type=ParameterValidator.VALIDATORS.MIN_LENGTH,
+            validator_type="MinLengthValidator",
             validator_params={"limit_value": 3},
         )
 
@@ -854,7 +1168,7 @@ class TestParameterValidator:
         )
         ParameterValidator.objects.create(
             parameter=param,
-            validator_type=ParameterValidator.VALIDATORS.MAX_LENGTH,
+            validator_type="MaxLengthValidator",
             validator_params={"limit_value": 10},
         )
 
@@ -876,7 +1190,7 @@ class TestParameterValidator:
         )
         ParameterValidator.objects.create(
             parameter=param,
-            validator_type=ParameterValidator.VALIDATORS.REGEX,
+            validator_type="RegexValidator",
             validator_params={"regex": r"^[A-Z]{3}\d{3}$"},
         )
 
@@ -899,7 +1213,7 @@ class TestParameterValidator:
         )
         param_validator = ParameterValidator.objects.create(
             parameter=param,
-            validator_type=ParameterValidator.VALIDATORS.MIN_VALUE,
+            validator_type="MinValueValidator",
             validator_params={"limit_value": 5},
         )
 
@@ -922,7 +1236,210 @@ class TestParameterValidator:
         )
         validator = ParameterValidator.objects.create(
             parameter=param,
-            validator_type=ParameterValidator.VALIDATORS.MIN_VALUE,
+            validator_type="MinValueValidator",
             validator_params={"limit_value": 5},
         )
         assert str(validator) == "test_param - Valeur minimale"
+
+
+@pytest.mark.django_db
+class TestCustomValidators:
+    """Test custom validators from settings"""
+
+    def test_custom_function_validator_from_settings(self, custom_validators_settings):
+        """Test using a custom function validator defined in settings"""
+        param = Parameter.objects.create(
+            name="test_even",
+            value="4",
+            value_type=Parameter.TYPES.INT,
+        )
+        ParameterValidator.objects.create(
+            parameter=param,
+            validator_type="even_number",  # From settings
+        )
+
+        # Should work with even numbers
+        param.set(6)
+        assert param.int() == 6
+
+        # Should fail with odd numbers
+        from django.core.exceptions import ValidationError
+
+        with pytest.raises(ValidationError):
+            param.set(7)
+
+    def test_custom_class_validator_from_settings(self, custom_validators_settings):
+        """Test using a custom class validator defined in settings"""
+        param = Parameter.objects.create(
+            name="test_range",
+            value="50",
+            value_type=Parameter.TYPES.INT,
+        )
+        ParameterValidator.objects.create(
+            parameter=param,
+            validator_type="custom_range",  # From settings
+            validator_params={"min_value": 10, "max_value": 100},
+        )
+
+        # Should work within range
+        param.set(75)
+        assert param.int() == 75
+
+        # Should fail outside range
+        from django.core.exceptions import ValidationError
+
+        with pytest.raises(ValidationError):
+            param.set(5)  # Too low
+
+        with pytest.raises(ValidationError):
+            param.set(150)  # Too high
+
+    def test_get_available_validators_includes_custom(self, custom_validators_settings):
+        """Test that get_available_validators includes custom validators"""
+        from django_app_parameter.utils import get_available_validators
+
+        validators = get_available_validators()
+
+        # Built-in validators
+        assert "MinValueValidator" in validators
+        assert "MaxValueValidator" in validators
+
+        # Custom validators from settings
+        assert "even_number" in validators
+        assert "custom_range" in validators
+        assert "positive" in validators
+
+        # Check display names
+        assert validators["MinValueValidator"] == "Valeur minimale"
+        assert "custom" in validators["even_number"].lower()
+
+    def test_import_validator_function(self):
+        """Test importing a function validator"""
+        from django_app_parameter.utils import import_validator
+
+        validator = import_validator("tests.test_validators.validate_even_number")
+        assert callable(validator)
+
+        # Test it works
+        validator(4)  # Should not raise
+
+        from django.core.exceptions import ValidationError
+
+        with pytest.raises(ValidationError):
+            validator(3)  # Should raise
+
+    def test_import_validator_class(self):
+        """Test importing a class validator"""
+        from django_app_parameter.utils import import_validator
+
+        ValidatorClass = import_validator("tests.test_validators.CustomRangeValidator")
+        assert callable(ValidatorClass)
+
+        # Instantiate and test
+        validator = ValidatorClass(min_value=0, max_value=10)
+        validator(5)  # Should not raise
+
+        from django.core.exceptions import ValidationError
+
+        with pytest.raises(ValidationError):
+            validator(15)  # Should raise
+
+    def test_invalid_validator_path_raises_import_error(self):
+        """Test that invalid validator paths raise ImportError"""
+        from django_app_parameter.utils import import_validator
+
+        # Invalid module path
+        with pytest.raises(ImportError, match="Cannot import module"):
+            import_validator("nonexistent.module.validator")
+
+        # Invalid validator name
+        with pytest.raises(AttributeError, match="does not have attribute"):
+            import_validator("tests.test_validators.nonexistent_validator")
+
+        # Invalid path format
+        with pytest.raises(ImportError, match="Invalid validator path"):
+            import_validator("invalid_path")
+
+    def test_validator_caching_mechanism(self, custom_validators_settings):
+        """Test that validators are cached after first import"""
+        from django_app_parameter.utils import (
+            clear_validator_cache,
+            get_validator_from_registry,
+        )
+
+        # Clear cache first
+        clear_validator_cache()
+
+        # First call should import
+        validator1 = get_validator_from_registry("even_number")
+        assert validator1 is not None
+
+        # Second call should return cached version (same object)
+        validator2 = get_validator_from_registry("even_number")
+        assert validator1 is validator2
+
+        # Clear cache and verify it's re-imported
+        clear_validator_cache()
+        validator3 = get_validator_from_registry("even_number")
+        assert validator3 is not None
+
+    def test_admin_form_validator_choices_include_custom(self, custom_validators_settings):
+        """Test that admin form includes custom validators in choices"""
+        from django_app_parameter.admin import ParameterValidatorForm
+
+        form = ParameterValidatorForm()
+
+        # Get the validator_type field choices
+        choices = form.fields["validator_type"].choices
+
+        # Convert to dict for easier testing
+        choice_keys = [key for key, _ in choices]
+
+        # Built-in validators
+        assert "MinValueValidator" in choice_keys
+        assert "MaxValueValidator" in choice_keys
+
+        # Custom validators
+        assert "even_number" in choice_keys
+        assert "custom_range" in choice_keys
+        assert "positive" in choice_keys
+
+    def test_unknown_validator_type_raises_error(self):
+        """Test that unknown validator_type raises ValueError"""
+        param = Parameter.objects.create(
+            name="test_unknown",
+            value="10",
+            value_type=Parameter.TYPES.INT,
+        )
+        validator = ParameterValidator.objects.create(
+            parameter=param,
+            validator_type="unknown_validator",  # Does not exist
+        )
+
+        with pytest.raises(ValueError, match="Unknown validator type"):
+            validator.get_validator()
+
+    def test_custom_validator_with_no_params(self, custom_validators_settings):
+        """Test custom function validator that takes no params"""
+        param = Parameter.objects.create(
+            name="test_positive",
+            value="5",
+            value_type=Parameter.TYPES.INT,
+        )
+        ParameterValidator.objects.create(
+            parameter=param,
+            validator_type="positive",  # Function validator, no params
+        )
+
+        # Should work with positive numbers
+        param.set(10)
+        assert param.int() == 10
+
+        # Should fail with zero or negative
+        from django.core.exceptions import ValidationError
+
+        with pytest.raises(ValidationError):
+            param.set(0)
+
+        with pytest.raises(ValidationError):
+            param.set(-5)

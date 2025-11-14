@@ -9,11 +9,16 @@ Arguments:
 import argparse
 import json
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from django.core.management.base import BaseCommand, CommandParser
 
-from django_app_parameter.models import Parameter, parameter_slugify
+from django_app_parameter.models import Parameter, ParameterValidator, parameter_slugify
+
+if TYPE_CHECKING:
+    from django.db.models.query import QuerySet
+
+    QuerySetPV = QuerySet[ParameterValidator]
 
 logger = logging.getLogger(__name__)
 
@@ -61,9 +66,67 @@ class Command(BaseCommand):
                 slug = param_values["slug"]
             else:
                 slug = parameter_slugify(param_values["name"])
+
+            # Extract validators from param_values if present
+            validators_data = param_values.pop("validators", None)
+
             if self.do_update:
                 logger.info("Updating parameter %s", slug)
-                Parameter.objects.update_or_create(slug=slug, defaults=param_values)
+                param, _ = Parameter.objects.update_or_create(
+                    slug=slug, defaults=param_values
+                )
             else:
                 logger.info("Adding parameter %s (no update)", slug)
-                Parameter.objects.get_or_create(slug=slug, defaults=param_values)
+                param, _ = Parameter.objects.get_or_create(
+                    slug=slug, defaults=param_values
+                )
+
+            # Handle validators - always process to ensure consistency
+            self._handle_validators(param, validators_data)
+
+    def _handle_validators(
+        self, parameter: Parameter, validators_data: list[dict[str, Any]] | None
+    ) -> None:
+        """Handle creation/update of validators for a parameter.
+
+        The validators in the JSON represent the desired final state.
+        All existing validators are removed and replaced with the ones from JSON.
+        If validators_data is None or empty, all validators are removed.
+
+        Args:
+            parameter: The Parameter instance to attach validators to
+            validators_data: List of validator definitions from JSON, or None
+        """
+        # Always clear existing validators first to ensure consistency
+        logger.info(
+            "Clearing existing validators for parameter %s", parameter.slug
+        )
+        existing_parameters: QuerySetPV = parameter.validators.all()  # type: ignore[attr-defined]
+        existing_parameters.delete()  # type: ignore[misc]
+
+        # If no validators provided, we're done (validators are already cleared)
+        if not validators_data:
+            return
+
+        # Create new validators from JSON
+        for validator_data in validators_data:
+            validator_type = validator_data.get("validator_type")
+            validator_params = validator_data.get("validator_params", {})
+
+            if not validator_type:
+                logger.warning(
+                    "Skipping validator without validator_type for parameter %s",
+                    parameter.slug,
+                )
+                continue
+
+            # Create validator
+            logger.info(
+                "Creating validator %s for parameter %s",
+                validator_type,
+                parameter.slug,
+            )
+            parameter.validators.create(  # type: ignore[attr-defined]
+                validator_type=validator_type,
+                validator_params=validator_params,
+            )

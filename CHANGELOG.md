@@ -3,6 +3,40 @@
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 
+## [Unreleased]
+
+### Added
+* Setter methods to programmatically update parameter values
+* Parameter validators with built-in validation rules (min/max value, length, regex, etc.)
+* `ParameterValidator` model to attach multiple validators to parameters
+* Custom validators support via `DJANGO_APP_PARAMETER['validators']` setting
+* Dynamic validator selection in Django admin with automatic form validation
+* Validator support in `load_param` management command via JSON format (validators in JSON represent the final desired state)
+* Demo project for manual testing and development with example custom validators
+* New parameter types:
+  * URL (validated URL)
+  * Email (validated email address)
+  * List (comma-separated values)
+  * Dict (JSON dictionary)
+  * Path (file path)
+  * Duration (time duration in seconds)
+  * Percentage (0-100)
+  * DateTime (ISO 8601 datetime)
+  * Date (YYYY-MM-DD)
+  * Time (HH:MM:SS)
+* Full type hints coverage with Pyright
+* Enhanced admin interface for managing setters and validators
+* Custom admin template for parameter change form
+
+### Changed
+* Modernized development tooling: migrated from Black/Flake8 to Ruff
+* Improved testing strategy with comprehensive test coverage
+* Updated documentation with new features and usage examples
+* Enhanced CONTRIBUTING.md with demo project instructions
+
+### Fixed
+* Migration for renaming DATE and TIME type codes to DAT and TIM (to avoid conflicts with new types)
+
 ## [1.1.3] - 2023.10.18
 
 ### Added

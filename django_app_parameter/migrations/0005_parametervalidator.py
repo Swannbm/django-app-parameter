@@ -28,24 +28,12 @@ class Migration(migrations.Migration):
                 (
                     "validator_type",
                     models.CharField(
-                        choices=[
-                            ("MinValueValidator", "Valeur minimale"),
-                            ("MaxValueValidator", "Valeur maximale"),
-                            ("MinLengthValidator", "Longueur minimale"),
-                            ("MaxLengthValidator", "Longueur maximale"),
-                            ("RegexValidator", "Expression régulière"),
-                            ("EmailValidator", "Validation email"),
-                            ("URLValidator", "Validation URL"),
-                            ("validate_slug", "Validation slug"),
-                            ("validate_ipv4_address", "Adresse IPv4"),
-                            ("validate_ipv6_address", "Adresse IPv6"),
-                            (
-                                "FileExtensionValidator",
-                                "Extensions de fichier autorisées",
-                            ),
-                        ],
-                        max_length=50,
+                        max_length=400,
                         verbose_name="Type de validateur",
+                        help_text=(
+                            "Nom du validateur Django intégré ou clé du validateur "
+                            "custom défini dans DJANGO_APP_PARAMETER['validators']"
+                        ),
                     ),
                 ),
                 (
@@ -70,7 +58,6 @@ class Migration(migrations.Migration):
             options={
                 "verbose_name": "Validateur de paramètre",
                 "verbose_name_plural": "Validateurs de paramètre",
-                "ordering": ["order"],
             },
         ),
     ]

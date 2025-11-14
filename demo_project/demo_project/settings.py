@@ -113,3 +113,11 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Django App Parameter configuration
+DJANGO_APP_PARAMETER = {
+    'validators': {
+        'business_hours': 'demo_project.validators.validate_business_hours',
+        'age': 'demo_project.validators.AgeValidator',
+    }
+}

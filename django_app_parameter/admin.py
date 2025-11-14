@@ -98,13 +98,61 @@ class ParameterEditForm(forms.ModelForm):
         return value
 
 
+class ParameterValidatorForm(forms.ModelForm):
+    """Form for ParameterValidator with dynamic validator_type choices"""
+
+    class Meta:
+        model = ParameterValidator
+        fields = ["validator_type", "validator_params"]
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+
+        # Import here to avoid circular imports (utils.py uses Django validators)
+        # Build dynamic choices from built-in + custom validators
+        from django_app_parameter.utils import get_available_validators
+
+        validators = get_available_validators()
+        choices = [("", "--- Sélectionnez un validateur ---")]
+        choices.extend(sorted(validators.items(), key=lambda x: x[1]))
+
+        # Set the field as a ChoiceField with dynamic choices
+        self.fields["validator_type"] = forms.ChoiceField(
+            choices=choices,
+            label="Type de validateur",
+            help_text=(
+                "Validateur Django intégré ou custom défini dans "
+                "DJANGO_APP_PARAMETER['validators']"
+            ),
+        )
+
+    def clean_validator_type(self) -> str:
+        """Validate that the validator_type exists in available validators"""
+        validator_type = self.cleaned_data.get("validator_type")
+
+        if not validator_type:
+            raise forms.ValidationError("Veuillez sélectionner un validateur")
+
+        # Import here to avoid circular imports (utils.py uses Django validators)
+        from django_app_parameter.utils import get_available_validators
+
+        available = get_available_validators()
+        if validator_type not in available:
+            raise forms.ValidationError(
+                f"Validateur '{validator_type}' non trouvé. "
+                f"Vérifiez DJANGO_APP_PARAMETER['validators']."
+            )
+
+        return validator_type
+
+
 class ParameterValidatorInline(_TabularInline):
     """Inline admin for managing validators associated with a Parameter"""
 
     model = ParameterValidator
+    form = ParameterValidatorForm
     extra = 1
     fields = ["validator_type", "validator_params"]
-    ordering = ["order"]
 
 
 @admin.register(Parameter)
