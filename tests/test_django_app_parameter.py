@@ -329,6 +329,254 @@ class TestParameter:
         with pytest.raises(ValueError, match="must be between 0 and 100"):
             param.percentage()
 
+    @pytest.mark.django_db
+    def test_to_dict_basic(self):
+        """Test to_dict() returns correct dictionary structure"""
+        param = Parameter.objects.create(
+            name="Test Param",
+            slug="TEST_PARAM",
+            value="test value",
+            value_type=Parameter.TYPES.STR,
+            description="Test description",
+            is_global=True,
+        )
+        result = param.to_dict()
+
+        assert isinstance(result, dict)
+        assert result["name"] == "Test Param"
+        assert result["slug"] == "TEST_PARAM"
+        assert result["value"] == "test value"
+        assert result["value_type"] == Parameter.TYPES.STR
+        assert result["description"] == "Test description"
+        assert result["is_global"] is True
+        assert "validators" not in result
+
+    @pytest.mark.django_db
+    def test_to_dict_with_validators(self):
+        """Test to_dict() includes validators"""
+        param = Parameter.objects.create(
+            name="Validated Param",
+            slug="VALIDATED_PARAM",
+            value="50",
+            value_type=Parameter.TYPES.INT,
+        )
+        ParameterValidator.objects.create(
+            parameter=param,
+            validator_type="MinValueValidator",
+            validator_params={"limit_value": 10},
+        )
+        ParameterValidator.objects.create(
+            parameter=param,
+            validator_type="MaxValueValidator",
+            validator_params={"limit_value": 100},
+        )
+
+        result = param.to_dict()
+
+        assert "validators" in result
+        assert len(result["validators"]) == 2
+        assert result["validators"][0]["validator_type"] == "MinValueValidator"
+        assert result["validators"][0]["validator_params"] == {"limit_value": 10}
+        assert result["validators"][1]["validator_type"] == "MaxValueValidator"
+        assert result["validators"][1]["validator_params"] == {"limit_value": 100}
+
+    @pytest.mark.django_db
+    def test_to_dict_minimal(self):
+        """Test to_dict() with minimal parameter (no description, not global)"""
+        param = Parameter.objects.create(
+            name="Minimal",
+            slug="MINIMAL",
+            value="value",
+        )
+        result = param.to_dict()
+
+        assert result["name"] == "Minimal"
+        assert result["slug"] == "MINIMAL"
+        assert result["value"] == "value"
+        assert result["value_type"] == Parameter.TYPES.STR  # default
+        assert result["description"] == ""
+        assert result["is_global"] is False
+        assert "validators" not in result
+
+    @pytest.mark.django_db
+    def test_from_dict_create_new(self):
+        """Test from_dict() creates a new parameter"""
+        param = Parameter()
+        data = {
+            "name": "New Param",
+            "slug": "NEW_PARAM",
+            "value": "test value",
+            "value_type": Parameter.TYPES.STR,
+            "description": "Test description",
+            "is_global": True,
+        }
+        param.from_dict(data)
+
+        assert param.pk is not None  # Should be saved
+        assert param.name == "New Param"
+        assert param.slug == "NEW_PARAM"
+        assert param.value == "test value"
+        assert param.value_type == Parameter.TYPES.STR
+        assert param.description == "Test description"
+        assert param.is_global is True
+
+    @pytest.mark.django_db
+    def test_from_dict_update_existing(self):
+        """Test from_dict() updates an existing parameter"""
+        param = Parameter.objects.create(
+            name="Original Name",
+            slug="ORIGINAL_SLUG",
+            value="original value",
+            value_type=Parameter.TYPES.STR,
+            description="Original description",
+            is_global=False,
+        )
+
+        # Update with new data
+        data = {
+            "name": "Updated Name",
+            "value": "updated value",
+            "description": "Updated description",
+            "is_global": True,
+            # slug and value_type should be ignored for existing instances
+            "slug": "NEW_SLUG",
+            "value_type": Parameter.TYPES.INT,
+        }
+        param.from_dict(data)
+
+        param.refresh_from_db()
+        assert param.name == "Updated Name"
+        assert param.value == "updated value"
+        assert param.description == "Updated description"
+        assert param.is_global is True
+        # These should not change for existing instances
+        assert param.slug == "ORIGINAL_SLUG"
+        assert param.value_type == Parameter.TYPES.STR
+
+    @pytest.mark.django_db
+    def test_from_dict_with_validators(self):
+        """Test from_dict() handles validators"""
+        param = Parameter()
+        data = {
+            "name": "Validated Param",
+            "slug": "VALIDATED_PARAM",
+            "value": "50",
+            "value_type": Parameter.TYPES.INT,
+            "validators": [
+                {
+                    "validator_type": "MinValueValidator",
+                    "validator_params": {"limit_value": 10},
+                },
+                {
+                    "validator_type": "MaxValueValidator",
+                    "validator_params": {"limit_value": 100},
+                },
+            ],
+        }
+        param.from_dict(data)
+
+        assert param.validators.count() == 2
+        validators = list(param.validators.all())
+        assert validators[0].validator_type == "MinValueValidator"
+        assert validators[0].validator_params == {"limit_value": 10}
+        assert validators[1].validator_type == "MaxValueValidator"
+        assert validators[1].validator_params == {"limit_value": 100}
+
+    @pytest.mark.django_db
+    def test_from_dict_replaces_validators(self):
+        """Test from_dict() replaces existing validators"""
+        param = Parameter.objects.create(
+            name="Test Param",
+            slug="TEST_PARAM",
+            value="50",
+            value_type=Parameter.TYPES.INT,
+        )
+        # Add initial validators
+        ParameterValidator.objects.create(
+            parameter=param,
+            validator_type="MinValueValidator",
+            validator_params={"limit_value": 5},
+        )
+        ParameterValidator.objects.create(
+            parameter=param,
+            validator_type="MaxValueValidator",
+            validator_params={"limit_value": 200},
+        )
+
+        assert param.validators.count() == 2
+
+        # Update with new validators
+        data = {
+            "name": "Test Param",
+            "value": "50",
+            "validators": [
+                {
+                    "validator_type": "MinValueValidator",
+                    "validator_params": {"limit_value": 10},
+                }
+            ],
+        }
+        param.from_dict(data)
+
+        # Should have only the new validator
+        assert param.validators.count() == 1
+        validator = param.validators.first()
+        assert validator.validator_type == "MinValueValidator"
+        assert validator.validator_params == {"limit_value": 10}
+
+    @pytest.mark.django_db
+    def test_from_dict_clears_validators(self):
+        """Test from_dict() can clear all validators"""
+        param = Parameter.objects.create(
+            name="Test Param",
+            slug="TEST_PARAM",
+            value="50",
+            value_type=Parameter.TYPES.INT,
+        )
+        ParameterValidator.objects.create(
+            parameter=param,
+            validator_type="MinValueValidator",
+            validator_params={"limit_value": 10},
+        )
+
+        assert param.validators.count() == 1
+
+        # Update with empty validators list
+        data = {
+            "name": "Test Param",
+            "value": "50",
+            "validators": [],
+        }
+        param.from_dict(data)
+
+        # Validators should be cleared
+        assert param.validators.count() == 0
+
+    @pytest.mark.django_db
+    def test_from_dict_partial_update(self):
+        """Test from_dict() with partial data"""
+        param = Parameter.objects.create(
+            name="Original",
+            slug="ORIGINAL",
+            value="original",
+            description="original description",
+            is_global=False,
+        )
+
+        # Update only name and value
+        data = {
+            "name": "Updated Name",
+            "value": "updated value",
+        }
+        param.from_dict(data)
+
+        param.refresh_from_db()
+        assert param.name == "Updated Name"
+        assert param.value == "updated value"
+        # These should remain unchanged
+        assert param.description == "original description"
+        assert param.is_global is False
+
 
 @pytest.mark.django_db
 class TestParameterManager:

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 import logging
 from datetime import date as date_type
@@ -12,8 +14,28 @@ from django.core.exceptions import ImproperlyConfigured, ValidationError
 from django.core.validators import URLValidator, validate_email
 from django.db import models
 from django.utils.text import slugify
+from typing_extensions import NotRequired, TypedDict
 
 logger = logging.getLogger(__name__)
+
+
+class ValidatorDict(TypedDict):
+    """Structure for validator data in JSON export/import"""
+
+    validator_type: str
+    validator_params: dict[str, Any]
+
+
+class ParameterDict(TypedDict):
+    """Structure for parameter data in JSON export/import"""
+
+    name: str
+    slug: str
+    value: str
+    value_type: str
+    description: str
+    is_global: bool
+    validators: NotRequired[list[ValidatorDict]]
 
 
 def parameter_slugify(content: str) -> str:
@@ -38,7 +60,7 @@ _time = time_type
 
 
 class ParameterManager(models.Manager["Parameter"]):
-    def get_from_slug(self, slug: _str) -> "Parameter":
+    def get_from_slug(self, slug: _str) -> Parameter:
         """Send ImproperlyConfigured exception if parameter is not in DB"""
         try:
             return super().get(slug=slug)
@@ -104,104 +126,45 @@ class ParameterManager(models.Manager["Parameter"]):
         logger.info("load json")
         for param_values in data:
             # Make a copy to avoid modifying the original data
-            param_values = dict(param_values)
+            param_dict = cast(ParameterDict, dict(param_values))
 
-            if "slug" in param_values:
-                slug = param_values["slug"]
+            if "slug" in param_dict:
+                slug = param_dict["slug"]
             else:
-                slug = parameter_slugify(param_values["name"])
-
-            # Extract validators from param_values if present
-            validators_data = param_values.pop("validators", None)
+                slug = parameter_slugify(param_dict["name"])
 
             if do_update:
                 logger.info("Updating parameter %s", slug)
-                param, _ = self.update_or_create(slug=slug, defaults=param_values)
+                # Try to get existing parameter or create new one
+                try:
+                    param = self.get(slug=slug)
+                    param.from_dict(param_dict)
+                except self.model.DoesNotExist:
+                    # Create new parameter
+                    param = self.model()
+                    param.from_dict(param_dict)
             else:
                 logger.info("Adding parameter %s (no update)", slug)
-                param, _ = self.get_or_create(slug=slug, defaults=param_values)
+                # Only create if doesn't exist
+                try:
+                    param = self.get(slug=slug)
+                    # Already exists, skip
+                except self.model.DoesNotExist:
+                    # Create new parameter
+                    param = self.model()
+                    param.from_dict(param_dict)
 
-            # Handle validators - always process to ensure consistency
-            self._handle_validators(param, validators_data)
-
-    def _handle_validators(
-        self, parameter: "Parameter", validators_data: _list[_dict[_str, Any]] | None
-    ) -> None:
-        """Handle creation/update of validators for a parameter.
-
-        The validators in the JSON represent the desired final state.
-        All existing validators are removed and replaced with the ones from JSON.
-        If validators_data is None or empty, all validators are removed.
-
-        Args:
-            parameter: The Parameter instance to attach validators to
-            validators_data: List of validator definitions from JSON, or None
-        """
-        # Always clear existing validators first to ensure consistency
-        logger.info("Clearing existing validators for parameter %s", parameter.slug)
-        existing_parameters = parameter.validators.all()  # type: ignore[attr-defined]
-        existing_parameters.delete()  # type: ignore[misc]
-
-        # If no validators provided, we're done (validators are already cleared)
-        if not validators_data:
-            return
-
-        # Create new validators from JSON
-        for validator_data in validators_data:
-            validator_type = validator_data.get("validator_type")
-            validator_params = validator_data.get("validator_params", {})
-
-            if not validator_type:
-                logger.warning(
-                    "Skipping validator without validator_type for parameter %s",
-                    parameter.slug,
-                )
-                continue
-
-            # Create validator
-            logger.info(
-                "Creating validator %s for parameter %s",
-                validator_type,
-                parameter.slug,
-            )
-            parameter.validators.create(  # type: ignore[attr-defined]
-                validator_type=validator_type,
-                validator_params=validator_params,
-            )
-
-    def dump_to_json(self) -> _list[_dict[_str, Any]]:
+    def dump_to_json(self) -> list[ParameterDict]:
         """Export all parameters to JSON-compatible format.
 
         Returns:
             List of parameter dictionaries with all fields and validators
         """
         logger.info("Dumping parameters to JSON")
-        result: _list[_dict[_str, Any]] = []
+        result: list[ParameterDict] = []
 
         for param in self.all():
-            param_data: _dict[_str, Any] = {
-                "name": param.name,
-                "slug": param.slug,
-                "value": param.value,
-                "value_type": param.value_type,
-                "description": param.description,
-                "is_global": param.is_global,
-            }
-
-            # Add validators if any
-            validators_qs = param.validators.all()  # type: ignore[attr-defined]
-            if validators_qs.exists():  # type: ignore[attr-defined]
-                validators: _list[_dict[_str, Any]] = []
-                for validator in validators_qs:  # type: ignore[attr-defined]
-                    validators.append(
-                        {
-                            "validator_type": validator.validator_type,  # type: ignore[attr-defined]
-                            "validator_params": validator.validator_params,  # type: ignore[attr-defined]
-                        }
-                    )
-                param_data["validators"] = validators
-
-            result.append(param_data)
+            result.append(param.to_dict())
 
         logger.info("Dumped %d parameters", len(result))
         return result
@@ -511,6 +474,109 @@ class Parameter(models.Model):
             raise ValueError(f"Percentage must be between 0 and 100, got {new_value}")
         self.value = _str(new_value)
         self.save()
+
+    def to_dict(self) -> ParameterDict:
+        """Export this parameter instance to JSON-compatible dictionary.
+
+        Returns:
+            Dictionary with all parameter fields and validators
+        """
+        param_data: ParameterDict = {
+            "name": self.name,
+            "slug": self.slug,
+            "value": self.value,
+            "value_type": self.value_type,
+            "description": self.description,
+            "is_global": self.is_global,
+        }
+
+        # Add validators if any
+        validators_qs = self.validators.all()  # type: ignore[attr-defined]
+        if validators_qs.exists():  # type: ignore[attr-defined]
+            validators: list[ValidatorDict] = []
+            for validator in validators_qs:  # type: ignore[attr-defined]
+                validators.append(
+                    {
+                        "validator_type": validator.validator_type,  # type: ignore[attr-defined]
+                        "validator_params": validator.validator_params,  # type: ignore[attr-defined]
+                    }
+                )
+            param_data["validators"] = validators
+
+        return param_data
+
+    def from_dict(self, data: ParameterDict) -> None:
+        """Update this parameter instance from a dictionary.
+
+        Args:
+            data: Dictionary containing parameter fields and optionally validators.
+                  The 'slug' and 'value_type' fields are ignored if the instance
+                  already exists (has a pk), as they should not be changed.
+                  Validators are always processed: if not present in data, existing
+                  validators are removed.
+        """
+        # Update basic fields
+        self.name = data.get("name", self.name)
+        self.value = data.get("value", self.value)
+        self.description = data.get("description", self.description)
+        self.is_global = data.get("is_global", self.is_global)
+
+        # Only update slug and value_type if instance is new (no pk)
+        if not self.pk:
+            if "slug" in data:
+                self.slug = data["slug"]
+            if "value_type" in data:
+                self.value_type = data["value_type"]
+
+        # Save the instance
+        self.save()
+
+        # Always handle validators to ensure consistency
+        # If not present in data, None will clear all validators
+        validators_data = data.get("validators", None)
+        self._update_validators(validators_data)
+
+    def _update_validators(self, validators_data: list[ValidatorDict] | None) -> None:
+        """Update validators for this parameter instance.
+
+        The validators in the data represent the desired final state.
+        All existing validators are removed and replaced with the ones from data.
+        If validators_data is None or empty, all validators are removed.
+
+        Args:
+            validators_data: List of validator definitions, or None
+        """
+        # Always clear existing validators first to ensure consistency
+        logger.info("Clearing existing validators for parameter %s", self.slug)
+        existing_validators = self.validators.all()  # type: ignore[attr-defined]
+        existing_validators.delete()  # type: ignore[misc]
+
+        # If no validators provided, we're done (validators are already cleared)
+        if not validators_data:
+            return
+
+        # Create new validators from data
+        for validator_data in validators_data:
+            validator_type = validator_data.get("validator_type")
+            validator_params = validator_data.get("validator_params", {})
+
+            if not validator_type:
+                logger.warning(
+                    "Skipping validator without validator_type for parameter %s",
+                    self.slug,
+                )
+                continue
+
+            # Create validator
+            logger.info(
+                "Creating validator %s for parameter %s",
+                validator_type,
+                self.slug,
+            )
+            self.validators.create(  # type: ignore[attr-defined]
+                validator_type=validator_type,
+                validator_params=validator_params,
+            )
 
     def __str__(self) -> _str:
         return self.name
