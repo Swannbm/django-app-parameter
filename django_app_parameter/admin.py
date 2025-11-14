@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from django.contrib.admin import TabularInline as BaseTabularInline
 
     class _ModelAdmin(BaseModelAdmin[Parameter]): ...
+
     class _TabularInline(BaseTabularInline[ParameterValidator]): ...
 else:
     _ModelAdmin = admin.ModelAdmin
@@ -46,6 +47,36 @@ class ParameterEditForm(forms.ModelForm):
         model = Parameter
         fields = ["name", "description", "value", "is_global"]
 
+    def _convert_value_to_type(self, value: Any, value_type: str) -> Any:
+        """Convert a value to its appropriate type for validation.
+
+        Args:
+            value: The raw value from the form
+            value_type: The parameter's value_type
+
+        Returns:
+            The value converted to the appropriate type
+
+        Raises:
+            ValueError: If conversion fails
+            TypeError: If value type is incorrect
+        """
+        if value_type == Parameter.TYPES.BOO.value:
+            return value if isinstance(value, bool) else bool(value)
+        elif value_type == Parameter.TYPES.INT.value:
+            return value if isinstance(value, int) else int(value)
+        elif value_type == Parameter.TYPES.FLT.value:
+            return value if isinstance(value, float) else float(value)
+        elif value_type == Parameter.TYPES.DCL.value:
+            from decimal import Decimal
+
+            return value if isinstance(value, Decimal) else Decimal(str(value))
+        elif value_type == Parameter.TYPES.PERCENTAGE.value:
+            return value if isinstance(value, (int, float)) else float(value)
+        else:
+            # For string-based types, use as-is
+            return value
+
     def clean_value(self) -> Any:
         """Validate the value field using the parameter's validators"""
         value = self.cleaned_data.get("value")
@@ -56,25 +87,7 @@ class ParameterEditForm(forms.ModelForm):
 
         # Convert string value to the appropriate type for validation
         try:
-            # Get the typed value to run validators on
-            typed_value: Any = None
-            if instance.value_type == Parameter.TYPES.BOO.value:
-                typed_value = value if isinstance(value, bool) else bool(value)
-            elif instance.value_type == Parameter.TYPES.INT.value:
-                typed_value = value if isinstance(value, int) else int(value)
-            elif instance.value_type == Parameter.TYPES.FLT.value:
-                typed_value = value if isinstance(value, float) else float(value)
-            elif instance.value_type == Parameter.TYPES.DCL.value:
-                from decimal import Decimal
-
-                typed_value = (
-                    value if isinstance(value, Decimal) else Decimal(str(value))
-                )
-            elif instance.value_type == Parameter.TYPES.PERCENTAGE.value:
-                typed_value = value if isinstance(value, (int, float)) else float(value)
-            else:
-                # For string-based types, use as-is
-                typed_value = value
+            typed_value = self._convert_value_to_type(value, instance.value_type)
 
             # Collect all validation errors
             error_messages: list[Any] = []
@@ -191,6 +204,111 @@ class ParameterAdmin(_ModelAdmin):
             return [ParameterValidatorInline]
         return []  # Creating - no inlines
 
+    def _get_field_mapping(
+        self,
+    ) -> dict[str, type[forms.Field] | type[forms.CharField]]:
+        """Get mapping of value types to form field classes.
+
+        Returns:
+            Dictionary mapping Parameter.TYPES values to form field classes
+        """
+        return {
+            Parameter.TYPES.BOO.value: forms.BooleanField,
+            Parameter.TYPES.INT.value: forms.IntegerField,
+            Parameter.TYPES.FLT.value: forms.FloatField,
+            Parameter.TYPES.DCL.value: forms.DecimalField,
+            Parameter.TYPES.DATE.value: forms.DateField,
+            Parameter.TYPES.DATETIME.value: forms.DateTimeField,
+            Parameter.TYPES.TIME.value: forms.TimeField,
+            Parameter.TYPES.URL.value: forms.URLField,
+            Parameter.TYPES.EMAIL.value: forms.EmailField,
+            Parameter.TYPES.STR.value: forms.CharField,
+            Parameter.TYPES.PATH.value: forms.CharField,
+            Parameter.TYPES.DURATION.value: forms.FloatField,
+            Parameter.TYPES.PERCENTAGE.value: forms.FloatField,
+        }
+
+    def _get_current_value(self, obj: Parameter) -> Any:
+        """Get the current value of a parameter in its typed form.
+
+        Args:
+            obj: The Parameter instance
+
+        Returns:
+            The current value converted to its appropriate type,
+            or raw value if conversion fails
+        """
+        try:
+            if obj.value_type == Parameter.TYPES.BOO.value:
+                return obj.bool()
+            elif obj.value_type == Parameter.TYPES.INT.value:
+                return obj.int()
+            elif obj.value_type == Parameter.TYPES.FLT.value:
+                return obj.float()
+            elif obj.value_type == Parameter.TYPES.DCL.value:
+                return obj.decimal()
+            elif obj.value_type == Parameter.TYPES.DATE.value:
+                return obj.date()
+            elif obj.value_type == Parameter.TYPES.DATETIME.value:
+                return obj.datetime()
+            elif obj.value_type == Parameter.TYPES.TIME.value:
+                return obj.time()
+            elif obj.value_type == Parameter.TYPES.DURATION.value:
+                return obj.duration().total_seconds()
+            elif obj.value_type == Parameter.TYPES.PERCENTAGE.value:
+                return obj.percentage()
+            else:
+                # For all string-based types
+                # (URL, EMAIL, STR, LIST, DICT, JSON, etc.)
+                return obj.value
+        except (ValueError, TypeError):
+            # If there's an error parsing, fall back to raw value
+            return obj.value
+
+    def _get_field_for_value_type(
+        self,
+        obj: Parameter,
+        field_mapping: dict[str, type[forms.Field] | type[forms.CharField]],
+    ) -> tuple[type[forms.Field] | type[forms.CharField], dict[str, Any]]:
+        """Get the appropriate form field class and kwargs for a value type.
+
+        Args:
+            obj: The Parameter instance
+            field_mapping: Mapping of value types to field classes
+
+        Returns:
+            Tuple of (field_class, field_kwargs)
+        """
+        current_value = self._get_current_value(obj)
+        field_kwargs: dict[str, Any] = {
+            "required": False,
+            "initial": current_value,
+        }
+
+        # Special handling for specific types
+        if obj.value_type == Parameter.TYPES.JSN.value:
+            field_kwargs["widget"] = forms.Textarea(attrs={"rows": 4})
+            return forms.CharField, field_kwargs
+        elif obj.value_type == Parameter.TYPES.DICT.value:
+            field_kwargs["widget"] = forms.Textarea(attrs={"rows": 4})
+            return forms.CharField, field_kwargs
+        elif obj.value_type == Parameter.TYPES.LIST.value:
+            field_kwargs["help_text"] = "Séparez les valeurs par des virgules"
+            return forms.CharField, field_kwargs
+        elif obj.value_type == Parameter.TYPES.PERCENTAGE.value:
+            field_kwargs["min_value"] = 0
+            field_kwargs["max_value"] = 100
+            field_kwargs["help_text"] = "Valeur entre 0 et 100"
+            field_class = field_mapping.get(obj.value_type, forms.CharField)
+            return field_class, field_kwargs
+        elif obj.value_type == Parameter.TYPES.DURATION.value:
+            field_kwargs["help_text"] = "Durée en secondes"
+            field_class = field_mapping.get(obj.value_type, forms.CharField)
+            return field_class, field_kwargs
+        else:
+            field_class = field_mapping.get(obj.value_type, forms.CharField)
+            return field_class, field_kwargs
+
     def get_form(
         self, request: HttpRequest, obj: Parameter | None = None, **kwargs: Any
     ) -> type[ModelForm]:
@@ -206,79 +324,10 @@ class ParameterAdmin(_ModelAdmin):
 
         # Customize the value field based on value_type
         if obj:  # Editing existing object
-            # Map value types to appropriate form fields
-            field_mapping: dict[str, type[forms.Field] | type[forms.CharField]] = {
-                Parameter.TYPES.BOO.value: forms.BooleanField,
-                Parameter.TYPES.INT.value: forms.IntegerField,
-                Parameter.TYPES.FLT.value: forms.FloatField,
-                Parameter.TYPES.DCL.value: forms.DecimalField,
-                Parameter.TYPES.DATE.value: forms.DateField,
-                Parameter.TYPES.DATETIME.value: forms.DateTimeField,
-                Parameter.TYPES.TIME.value: forms.TimeField,
-                Parameter.TYPES.URL.value: forms.URLField,
-                Parameter.TYPES.EMAIL.value: forms.EmailField,
-                Parameter.TYPES.STR.value: forms.CharField,
-                Parameter.TYPES.PATH.value: forms.CharField,
-                Parameter.TYPES.DURATION.value: forms.FloatField,
-                Parameter.TYPES.PERCENTAGE.value: forms.FloatField,
-            }
-
-            # Get the current value to pre-populate the field
-            current_value: Any = None
-            try:
-                if obj.value_type == Parameter.TYPES.BOO.value:
-                    current_value = obj.bool()
-                elif obj.value_type == Parameter.TYPES.INT.value:
-                    current_value = obj.int()
-                elif obj.value_type == Parameter.TYPES.FLT.value:
-                    current_value = obj.float()
-                elif obj.value_type == Parameter.TYPES.DCL.value:
-                    current_value = obj.decimal()
-                elif obj.value_type == Parameter.TYPES.DATE.value:
-                    current_value = obj.date()
-                elif obj.value_type == Parameter.TYPES.DATETIME.value:
-                    current_value = obj.datetime()
-                elif obj.value_type == Parameter.TYPES.TIME.value:
-                    current_value = obj.time()
-                elif obj.value_type == Parameter.TYPES.DURATION.value:
-                    current_value = obj.duration().total_seconds()
-                elif obj.value_type == Parameter.TYPES.PERCENTAGE.value:
-                    current_value = obj.percentage()
-                else:
-                    # For all string-based types
-                    # (URL, EMAIL, STR, LIST, DICT, JSON, etc.)
-                    current_value = obj.value
-            except (ValueError, TypeError):
-                # If there's an error parsing, fall back to raw value
-                current_value = obj.value
-
-            # Create new field instance with appropriate widget
-            field_kwargs: dict[str, Any] = {
-                "required": False,
-                "initial": current_value,
-            }
-
-            # Special handling for TEXTAREA widgets
-            if obj.value_type == Parameter.TYPES.JSN.value:
-                field_kwargs["widget"] = forms.Textarea(attrs={"rows": 4})
-                field_class = forms.CharField
-            elif obj.value_type == Parameter.TYPES.DICT.value:
-                field_kwargs["widget"] = forms.Textarea(attrs={"rows": 4})
-                field_class = forms.CharField
-            elif obj.value_type == Parameter.TYPES.LIST.value:
-                field_kwargs["help_text"] = "Séparez les valeurs par des virgules"
-                field_class = forms.CharField
-            elif obj.value_type == Parameter.TYPES.PERCENTAGE.value:
-                field_kwargs["min_value"] = 0
-                field_kwargs["max_value"] = 100
-                field_kwargs["help_text"] = "Valeur entre 0 et 100"
-                field_class = field_mapping.get(obj.value_type, forms.CharField)
-            elif obj.value_type == Parameter.TYPES.DURATION.value:
-                field_kwargs["help_text"] = "Durée en secondes"
-                field_class = field_mapping.get(obj.value_type, forms.CharField)
-            else:
-                field_class = field_mapping.get(obj.value_type, forms.CharField)
-
+            field_mapping = self._get_field_mapping()
+            field_class, field_kwargs = self._get_field_for_value_type(
+                obj, field_mapping
+            )
             form_class.base_fields["value"] = field_class(**field_kwargs)
 
         return form_class

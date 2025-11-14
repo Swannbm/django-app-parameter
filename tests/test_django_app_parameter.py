@@ -89,7 +89,7 @@ class TestParameter:
         )
         result = param.float()
         assert isinstance(result, float)
-        assert result == float(0.1)
+        assert result == 0.1
         assert isinstance(param.get(), float)
 
     def test_decimal(self):
@@ -513,9 +513,11 @@ class TestLoadParamWithValidators:
         assert validator.validator_type == "even_number"
 
         # Test that the validator actually works
+        from django.core.exceptions import ValidationError
+
         validator_func = validator.get_validator()
         validator_func(10)  # Should pass
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             validator_func(11)  # Should fail
 
     def test_load_param_without_validators(self):
@@ -737,7 +739,7 @@ class Test_app_parameter:
         assert app_parameter.BLOG_TITLE == "my awesome blog"
 
     def test_set_param(self, params):
-        with pytest.raises(Exception):
+        with pytest.raises(Exception, match="You can't set an app parameter"):
             app_parameter.BIRTH_YEAR = 1983
 
 
@@ -1383,7 +1385,9 @@ class TestCustomValidators:
         validator3 = get_validator_from_registry("even_number")
         assert validator3 is not None
 
-    def test_admin_form_validator_choices_include_custom(self, custom_validators_settings):
+    def test_admin_form_validator_choices_include_custom(
+        self, custom_validators_settings
+    ):
         """Test that admin form includes custom validators in choices"""
         from django_app_parameter.admin import ParameterValidatorForm
 
@@ -1443,3 +1447,365 @@ class TestCustomValidators:
 
         with pytest.raises(ValidationError):
             param.set(-5)
+
+
+class TestParameterManagerDumpLoad:
+    """Test the load_from_json and dump_to_json methods of ParameterManager"""
+
+    @pytest.mark.django_db
+    def test_dump_to_json_basic(self):
+        """Test basic dump_to_json functionality"""
+        # Create test parameters
+        Parameter.objects.create(
+            name="Test Param 1",
+            slug="TEST_PARAM_1",
+            value="value1",
+            value_type="STR",
+            description="Test description",
+            is_global=True,
+        )
+        Parameter.objects.create(
+            name="Test Param 2",
+            slug="TEST_PARAM_2",
+            value="42",
+            value_type="INT",
+            description="",
+            is_global=False,
+        )
+
+        # Dump to JSON
+        result = Parameter.objects.dump_to_json()
+
+        # Verify result structure
+        assert isinstance(result, list)
+        assert len(result) == 2
+
+        # Verify first parameter
+        param1 = result[0]
+        assert param1["name"] == "Test Param 1"
+        assert param1["slug"] == "TEST_PARAM_1"
+        assert param1["value"] == "value1"
+        assert param1["value_type"] == "STR"
+        assert param1["description"] == "Test description"
+        assert param1["is_global"] is True
+
+        # Verify second parameter
+        param2 = result[1]
+        assert param2["name"] == "Test Param 2"
+        assert param2["slug"] == "TEST_PARAM_2"
+        assert param2["value"] == "42"
+        assert param2["value_type"] == "INT"
+
+    @pytest.mark.django_db
+    def test_dump_to_json_with_validators(self):
+        """Test dump_to_json includes validators"""
+        param = Parameter.objects.create(
+            name="Test Param",
+            slug="TEST_PARAM",
+            value="10",
+            value_type="INT",
+        )
+
+        # Add validators
+        ParameterValidator.objects.create(
+            parameter=param,
+            validator_type="MinValueValidator",
+            validator_params={"limit_value": 5},
+        )
+        ParameterValidator.objects.create(
+            parameter=param,
+            validator_type="MaxValueValidator",
+            validator_params={"limit_value": 100},
+        )
+
+        # Dump to JSON
+        result = Parameter.objects.dump_to_json()
+
+        assert len(result) == 1
+        param_data = result[0]
+
+        # Verify validators are included
+        assert "validators" in param_data
+        assert len(param_data["validators"]) == 2
+
+        validators = param_data["validators"]
+        assert validators[0]["validator_type"] == "MinValueValidator"
+        assert validators[0]["validator_params"] == {"limit_value": 5}
+        assert validators[1]["validator_type"] == "MaxValueValidator"
+        assert validators[1]["validator_params"] == {"limit_value": 100}
+
+    @pytest.mark.django_db
+    def test_dump_to_json_without_validators(self):
+        """Test dump_to_json excludes validators key when no validators"""
+        Parameter.objects.create(
+            name="Test Param",
+            slug="TEST_PARAM",
+            value="test",
+        )
+
+        result = Parameter.objects.dump_to_json()
+
+        assert len(result) == 1
+        # No validators key should be present
+        assert "validators" not in result[0]
+
+    @pytest.mark.django_db
+    def test_dump_to_json_empty_database(self):
+        """Test dump_to_json with empty database"""
+        result = Parameter.objects.dump_to_json()
+
+        assert isinstance(result, list)
+        assert len(result) == 0
+
+    @pytest.mark.django_db
+    def test_load_from_json_basic(self):
+        """Test basic load_from_json functionality"""
+        data = [
+            {
+                "name": "New Param",
+                "value": "test value",
+                "value_type": "STR",
+                "description": "Test description",
+                "is_global": True,
+            }
+        ]
+
+        Parameter.objects.load_from_json(data)
+
+        # Verify parameter was created
+        param = Parameter.objects.get(slug="NEW_PARAM")
+        assert param.name == "New Param"
+        assert param.value == "test value"
+        assert param.value_type == "STR"
+        assert param.description == "Test description"
+        assert param.is_global is True
+
+    @pytest.mark.django_db
+    def test_load_from_json_with_custom_slug(self):
+        """Test load_from_json with custom slug"""
+        data = [
+            {
+                "name": "Custom Slug Param",
+                "slug": "CUSTOM_SLUG",
+                "value": "test",
+            }
+        ]
+
+        Parameter.objects.load_from_json(data)
+
+        param = Parameter.objects.get(slug="CUSTOM_SLUG")
+        assert param.name == "Custom Slug Param"
+        assert param.slug == "CUSTOM_SLUG"
+
+    @pytest.mark.django_db
+    def test_load_from_json_update_existing(self):
+        """Test load_from_json updates existing parameters by default"""
+        # Create initial parameter
+        Parameter.objects.create(
+            name="Test Param",
+            slug="TEST_PARAM",
+            value="old value",
+        )
+
+        # Load with updated value
+        data = [
+            {
+                "slug": "TEST_PARAM",
+                "name": "Updated Name",
+                "value": "new value",
+            }
+        ]
+
+        Parameter.objects.load_from_json(data, do_update=True)
+
+        # Verify parameter was updated
+        param = Parameter.objects.get(slug="TEST_PARAM")
+        assert param.name == "Updated Name"
+        assert param.value == "new value"
+
+    @pytest.mark.django_db
+    def test_load_from_json_no_update(self):
+        """Test load_from_json with do_update=False"""
+        # Create initial parameter
+        Parameter.objects.create(
+            name="Test Param",
+            slug="TEST_PARAM",
+            value="old value",
+        )
+
+        # Try to load with updated value but no_update
+        data = [
+            {
+                "slug": "TEST_PARAM",
+                "name": "Updated Name",
+                "value": "new value",
+            }
+        ]
+
+        Parameter.objects.load_from_json(data, do_update=False)
+
+        # Verify parameter was NOT updated
+        param = Parameter.objects.get(slug="TEST_PARAM")
+        assert param.name == "Test Param"  # Original name
+        assert param.value == "old value"  # Original value
+
+    @pytest.mark.django_db
+    def test_load_from_json_with_validators(self):
+        """Test load_from_json creates validators"""
+        data = [
+            {
+                "name": "Validated Param",
+                "value": "10",
+                "value_type": "INT",
+                "validators": [
+                    {
+                        "validator_type": "MinValueValidator",
+                        "validator_params": {"limit_value": 5},
+                    },
+                    {
+                        "validator_type": "MaxValueValidator",
+                        "validator_params": {"limit_value": 100},
+                    },
+                ],
+            }
+        ]
+
+        Parameter.objects.load_from_json(data)
+
+        param = Parameter.objects.get(slug="VALIDATED_PARAM")
+        validators = param.validators.all()
+
+        assert validators.count() == 2
+        assert validators[0].validator_type == "MinValueValidator"
+        assert validators[0].validator_params == {"limit_value": 5}
+        assert validators[1].validator_type == "MaxValueValidator"
+        assert validators[1].validator_params == {"limit_value": 100}
+
+    @pytest.mark.django_db
+    def test_load_from_json_replaces_validators(self):
+        """Test load_from_json replaces existing validators"""
+        # Create parameter with validators
+        param = Parameter.objects.create(
+            name="Test Param",
+            slug="TEST_PARAM",
+            value="10",
+            value_type="INT",
+        )
+        ParameterValidator.objects.create(
+            parameter=param,
+            validator_type="MinValueValidator",
+            validator_params={"limit_value": 1},
+        )
+
+        # Load with different validators
+        data = [
+            {
+                "slug": "TEST_PARAM",
+                "name": "Test Param",
+                "value": "10",
+                "value_type": "INT",
+                "validators": [
+                    {
+                        "validator_type": "MaxValueValidator",
+                        "validator_params": {"limit_value": 100},
+                    }
+                ],
+            }
+        ]
+
+        Parameter.objects.load_from_json(data)
+
+        # Verify old validators are gone and new ones are present
+        param = Parameter.objects.get(slug="TEST_PARAM")
+        validators = param.validators.all()
+
+        assert validators.count() == 1
+        assert validators[0].validator_type == "MaxValueValidator"
+
+    @pytest.mark.django_db
+    def test_load_from_json_removes_validators_when_not_in_json(self):
+        """Test load_from_json removes validators when not in JSON"""
+        # Create parameter with validators
+        param = Parameter.objects.create(
+            name="Test Param",
+            slug="TEST_PARAM",
+            value="10",
+            value_type="INT",
+        )
+        ParameterValidator.objects.create(
+            parameter=param,
+            validator_type="MinValueValidator",
+            validator_params={"limit_value": 1},
+        )
+
+        # Load without validators key
+        data = [
+            {
+                "slug": "TEST_PARAM",
+                "name": "Test Param",
+                "value": "10",
+                "value_type": "INT",
+            }
+        ]
+
+        Parameter.objects.load_from_json(data)
+
+        # Verify validators are removed
+        param = Parameter.objects.get(slug="TEST_PARAM")
+        assert param.validators.count() == 0
+
+    @pytest.mark.django_db
+    def test_dump_load_roundtrip(self):
+        """Test that dump → load → dump produces identical results"""
+        # Create test parameters with validators
+        param1 = Parameter.objects.create(
+            name="Param 1",
+            slug="PARAM_1",
+            value="test",
+            value_type="STR",
+            description="Description 1",
+            is_global=True,
+        )
+        ParameterValidator.objects.create(
+            parameter=param1,
+            validator_type="MinLengthValidator",
+            validator_params={"limit_value": 3},
+        )
+
+        Parameter.objects.create(
+            name="Param 2",
+            slug="PARAM_2",
+            value="42",
+            value_type="INT",
+            description="Description 2",
+            is_global=False,
+        )
+
+        # First dump
+        dump1 = Parameter.objects.dump_to_json()
+
+        # Clear database and reload
+        Parameter.objects.all().delete()
+        Parameter.objects.load_from_json(dump1)
+
+        # Second dump
+        dump2 = Parameter.objects.dump_to_json()
+
+        # Compare dumps (should be identical)
+        assert dump1 == dump2
+
+    @pytest.mark.django_db
+    def test_load_from_json_multiple_parameters(self):
+        """Test load_from_json with multiple parameters"""
+        data = [
+            {"name": "Param 1", "value": "value1"},
+            {"name": "Param 2", "value": "value2"},
+            {"name": "Param 3", "value": "value3"},
+        ]
+
+        Parameter.objects.load_from_json(data)
+
+        assert Parameter.objects.count() == 3
+        assert Parameter.objects.filter(slug="PARAM_1").exists()
+        assert Parameter.objects.filter(slug="PARAM_2").exists()
+        assert Parameter.objects.filter(slug="PARAM_3").exists()

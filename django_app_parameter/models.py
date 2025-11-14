@@ -578,7 +578,8 @@ class ParameterValidator(models.Model):
 
         # Class-based validators need instantiation with params
         params: _dict[_str, Any] = cast(
-            _dict[_str, Any], self.validator_params  # type: ignore[arg-type]
+            _dict[_str, Any],
+            self.validator_params,  # type: ignore[arg-type]
         )
         return cast(Callable[[Any], None], validator_class(**params))
 

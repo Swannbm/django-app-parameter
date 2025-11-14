@@ -51,7 +51,7 @@ def get_setting(key: str, default: Any = None) -> Any:
         The setting value or default
 
     Example:
-        >>> get_setting('validators', {})
+        >>> get_setting("validators", {})
         {'even_number': 'myapp.validators.validate_even_number'}
     """
     app_settings = getattr(settings, "DJANGO_APP_PARAMETER", {})
@@ -74,7 +74,7 @@ def import_validator(validator_path: str) -> Any:
         AttributeError: If the validator doesn't exist in the module
 
     Example:
-        >>> validator = import_validator('myapp.validators.validate_even_number')
+        >>> validator = import_validator("myapp.validators.validate_even_number")
         >>> validator(4)  # Should not raise
         >>> validator(3)  # Should raise ValidationError
     """
@@ -123,12 +123,12 @@ def get_validator_from_registry(
 
     Example:
         >>> # Built-in validator
-        >>> validator = get_validator_from_registry('MinValueValidator')
+        >>> validator = get_validator_from_registry("MinValueValidator")
         >>> validator is MinValueValidator
         True
 
         >>> # Custom validator (from settings)
-        >>> validator = get_validator_from_registry('even_number')
+        >>> validator = get_validator_from_registry("even_number")
         >>> validator.__name__
         'validate_even_number'
     """
@@ -169,9 +169,9 @@ def get_available_validators() -> dict[str, str]:
 
     Example:
         >>> validators = get_available_validators()
-        >>> 'MinValueValidator' in validators
+        >>> "MinValueValidator" in validators
         True
-        >>> 'even_number' in validators  # If defined in settings
+        >>> "even_number" in validators  # If defined in settings
         True
     """
     validators: dict[str, str] = {}

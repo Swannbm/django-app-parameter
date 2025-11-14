@@ -13,7 +13,7 @@ in views.py:
 """
 
 from decimal import Decimal
-from typing import Any, Union
+from typing import Any
 
 
 class AccessParameter:
@@ -22,7 +22,7 @@ class AccessParameter:
     Parameter value through app_parameter.A_RANDOM_SLUG
     """
 
-    def __getattr__(self, slug: str) -> Union[int, str, float, Decimal, bool, Any]:
+    def __getattr__(self, slug: str) -> int | str | float | Decimal | bool | Any:
         from .models import Parameter
 
         param = Parameter.objects.get_from_slug(slug)  # type: ignore[attr-defined]
