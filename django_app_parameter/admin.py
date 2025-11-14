@@ -1,4 +1,9 @@
+from typing import TYPE_CHECKING
+
 from django.contrib import admin
+
+if TYPE_CHECKING:
+    from .models import Parameter as ParameterModel
 
 from .models import Parameter
 
