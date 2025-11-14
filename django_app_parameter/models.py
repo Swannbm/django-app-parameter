@@ -199,6 +199,11 @@ class Parameter(models.Model):
     description = models.TextField("Description", blank=True)
     value = models.CharField("Valeur", max_length=250)
     is_global = models.BooleanField(default=False)
+    enable_cypher = models.BooleanField(
+        "Chiffrement activé",
+        default=False,
+        help_text="Si activé, la valeur sera chiffrée en base de données",
+    )
 
     def save(self, *args: Any, **kwargs: Any) -> None:
         if not self.slug:
