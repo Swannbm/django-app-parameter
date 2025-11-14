@@ -812,25 +812,34 @@ class Command(BaseCommand):
             self.setup_production()
 
     def setup_development(self):
-        Parameter.objects.create_or_update({
-            'name': 'Debug Mode',
-            'value': 'true',
-            'value_type': 'BOO'
-        })
+        Parameter.objects.update_or_create(
+            slug='DEBUG_MODE',
+            defaults={
+                'name': 'Debug Mode',
+                'value': 'true',
+                'value_type': 'BOO'
+            }
+        )
 
     def setup_staging(self):
-        Parameter.objects.create_or_update({
-            'name': 'Debug Mode',
-            'value': 'false',
-            'value_type': 'BOO'
-        })
+        Parameter.objects.update_or_create(
+            slug='DEBUG_MODE',
+            defaults={
+                'name': 'Debug Mode',
+                'value': 'false',
+                'value_type': 'BOO'
+            }
+        )
 
     def setup_production(self):
-        Parameter.objects.create_or_update({
-            'name': 'Debug Mode',
-            'value': 'false',
-            'value_type': 'BOO'
-        })
+        Parameter.objects.update_or_create(
+            slug='DEBUG_MODE',
+            defaults={
+                'name': 'Debug Mode',
+                'value': 'false',
+                'value_type': 'BOO'
+            }
+        )
 ```
 
 ## Prochaines étapes

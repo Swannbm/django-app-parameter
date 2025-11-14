@@ -9,8 +9,9 @@ Arguments:
 import argparse
 import json
 import logging
+from typing import Any
 
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandParser
 
 from django_app_parameter.models import Parameter
 
@@ -20,7 +21,7 @@ logger = logging.getLogger(__name__)
 class Command(BaseCommand):
     help = "Import parameters into the database"
 
-    def add_arguments(self, parser):
+    def add_arguments(self, parser: CommandParser) -> None:
         parser.add_argument(
             "--file",
             type=argparse.FileType("r"),
@@ -35,7 +36,7 @@ class Command(BaseCommand):
             default=argparse.SUPPRESS,
         )
 
-    def handle(self, *args, **options):
+    def handle(self, *args: Any, **options: Any) -> None:
         logger.info("Load parameter start")
         # store opposite to flag
         self.do_update = not options.get("no_update", False)
@@ -53,11 +54,16 @@ class Command(BaseCommand):
             self.load_json(options["json"])
         logger.info("End load parameter")
 
-    def load_json(self, data):
+    def load_json(self, data: Any) -> None:
         logger.info("load json")
         for param_values in data:
-            logger.debug("Add %s", param_values)
-            result = Parameter.objects.create_or_update(
-                param_values, update=self.do_update
-            )
-            logger.debug("Result %s", result)
+            if self.do_update:
+                logger.info("Updating parameter %s", param_values["slug"])
+                Parameter.objects.update_or_create(
+                    slug=param_values["slug"], defaults=param_values
+                )
+            else:
+                logger.info("Adding parameter %s (no update)", param_values["slug"])
+                Parameter.objects.get_or_create(
+                    slug=param_values["slug"], defaults=param_values
+                )
