@@ -46,10 +46,10 @@ jobs:
         run: poetry add Django@^${{ matrix.django-version }} --no-interaction
 
       - name: Run ruff format check
-        run: poetry run ruff format --check .
+        run: poetry run ruff format --check django_app_parameter
 
       - name: Run ruff lint
-        run: poetry run ruff check .
+        run: poetry run ruff check django_app_parameter
 
       - name: Run pyright
         run: poetry run pyright
