@@ -1,145 +1,74 @@
-# Installation and Configuration
+# Installation
 
 ## Prerequisites
 
-- **Python**: 3.7 or higher
-- **Django**: 3.2 or higher
+- Python 3.7+
+- Django 3.2+
 
-## Installation
+## Install
 
 ```bash
 pip install django-app-parameter
 ```
 
-### From Source
-
-```bash
-git clone https://github.com/Swannbm/django-app-parameter.git
-cd django-app-parameter
-pip install -e .
-```
-
-## Basic Configuration
-
-### 1. Add to INSTALLED_APPS
-
-Edit your `settings.py` file:
+## Configure
 
 ```python
+# settings.py
 INSTALLED_APPS = [
-    'django.contrib.admin',
-    'django.contrib.auth',
-    'django.contrib.contenttypes',
-    'django.contrib.sessions',
-    'django.contrib.messages',
-    'django.contrib.staticfiles',
-
-    # Your applications
-    'myapp',
-
-    # Django App Parameter
-    'django_app_parameter',
+    # ...
+    'django_app_parameter',  # After Django base apps
 ]
 ```
-
-**Important**: Place `django_app_parameter` after Django's base applications to ensure the admin is available.
-
-### 2. Apply Migrations
 
 ```bash
-python manage.py migrate django_app_parameter
+python manage.py migrate
 ```
 
-## Advanced Configuration (Optional)
+## Optional: Templates
 
-### Enable Global Parameters in Templates
-
-If you want to access parameters directly in your Django templates, add the context processor:
+Add context processor for global parameters in templates:
 
 ```python
-TEMPLATES = [
-    {
-        'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [BASE_DIR / 'templates'],
-        'APP_DIRS': True,
-        'OPTIONS': {
-            'context_processors': [
-                'django.template.context_processors.debug',
-                'django.template.context_processors.request',
-                'django.contrib.auth.context_processors.auth',
-                'django.contrib.messages.context_processors.messages',
-
-                # Add this context processor
-                'django_app_parameter.context_processors.add_global_parameter_context',
-            ],
-        },
+# settings.py
+TEMPLATES = [{
+    'OPTIONS': {
+        'context_processors': [
+            # ...
+            'django_app_parameter.context_processors.add_global_parameter_context',
+        ],
     },
-]
+}]
 ```
 
-**Note**: Only parameters with `is_global=True` will be available in templates.
+Only `is_global=True` parameters available.
 
-### Create Default Parameters at App Startup
+## Optional: Initial Parameters
 
-Create an `initial_parameters.json` file:
+Create `initial_parameters.json`:
 
 ```json
 [
     {
         "name": "Blog Title",
-        "value": "My Awesome Blog",
+        "value": "My Blog",
         "value_type": "STR",
-        "is_global": true,
-        "description": "Main blog title"
-    },
-    {
-        "name": "Max Upload Size",
-        "value": "5242880",
-        "value_type": "INT",
-        "description": "Max upload size in bytes"
-    },
-    {
-        "name": "Tax Rate",
-        "value": "20.00",
-        "value_type": "DCL",
-        "description": "Tax rate in percentage"
-    },
-    {
-        "name": "Maintenance Mode",
-        "value": "false",
-        "value_type": "BOO",
-        "is_global": true,
-        "description": "Enable maintenance mode"
+        "is_global": true
     }
 ]
 ```
 
-Add the following command at the same location as your database migration:
+Load in deployment:
 
 ```bash
-python manage.py load_param --no-update --file initial_parameters.json
-```
-
-For example:
-```bash
-#!/bin/bash
-# deploy.sh
-
-# Apply migrations
 python manage.py migrate
-
-# Load required parameters without overwriting existing ones
-python manage.py load_param --no-update --file config/required_parameters.json
-
-# Collect static files
+python manage.py load_param --no-update --file initial_parameters.json
 python manage.py collectstatic --noinput
-
-# Start the application
-gunicorn myproject.wsgi
 ```
 
-## Next Steps
+See [management-commands.md](management-commands.md) for details.
 
-- [Usage Guide with Practical Examples](usage-guide.md)
-- [Complete API Reference](api-reference.md)
-- [load_param Management Command](management-commands.md)
+## Next
+
+- [Usage Guide](usage-guide.md)
+- [Management Commands](management-commands.md)

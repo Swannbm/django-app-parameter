@@ -1,216 +1,157 @@
-# Vue d'ensemble
+# Overview
 
-## Qu'est-ce que Django App Parameter ?
+Store application parameters in database. Modify via Django admin without code changes or restart.
 
-Django App Parameter est une extension Django qui permet de stocker des paramètres d'application configurables dans la base de données. Ces paramètres peuvent être modifiés dynamiquement via l'interface d'administration Django, sans nécessiter de modifications du code ou de redémarrage du serveur.
+## Problem
 
-## Problème résolu
+- **`settings.py`**: Static, requires redeployment
+- **Env vars**: Hard to change in production
+- **Custom DB**: Need custom development
 
-Dans une application Django typique, les configurations sont souvent définies dans :
-- **`settings.py`** : Configuration statique nécessitant un redéploiement pour toute modification
-- **Variables d'environnement** : Configuration par environnement, difficile à modifier en production
-- **Base de données personnalisée** : Nécessite de développer une solution sur mesure
+Solution: **Runtime-modifiable parameters** for administrators.
 
-Django App Parameter offre une solution clé en main pour les **paramètres modifiables à l'exécution** par les administrateurs.
+## Features
 
-## Caractéristiques principales
+- **Database storage** via Django ORM
+- **Admin interface** for CRUD operations
+- **15 types**: INT, STR, FLT, DCL, JSN, BOO, DATE, DATETIME, TIME, URL, EMAIL, LIST, DICT, PATH, DURATION, PERCENTAGE
+- **Validators**: Built-in Django validators + custom validators
+- **Type-safe setters**: `param.set()` with automatic validation
+- **Auto slug generation**: `"blog title"` → `"BLOG_TITLE"`
+- **Bulk loading** via `load_param` command
+- **Export** via `dump_param` command
+- **Zero dependencies** (Django 3.2+ only)
+- **100% test coverage**
 
-### 1. Stockage en base de données
-Tous les paramètres sont stockés dans une table dédiée, accessibles via l'ORM Django standard.
+## Access Patterns
 
-### 2. Interface d'administration
-Gestion complète des paramètres via l'admin Django :
-- Création, modification, suppression
-- Recherche et filtrage
-- Interface utilisateur familière
-
-### 3. Typage des valeurs
-Support de 6 types de données avec conversion automatique :
-- **INT** : Nombres entiers
-- **STR** : Chaînes de caractères (par défaut)
-- **FLT** : Nombres à virgule flottante (float)
-- **DCL** : Nombres décimaux (Decimal, pour précision)
-- **JSN** : Structures JSON (dictionnaires, listes)
-- **BOO** : Booléens (true/false)
-
-### 4. Accès simple et intuitif
-Trois patterns d'accès disponibles :
-
-**Pattern proxy (recommandé) :**
+**Proxy (recommended):**
 ```python
 from django_app_parameter import app_parameter
-titre = app_parameter.BLOG_TITLE  # Conversion automatique selon le type
+title = app_parameter.BLOG_TITLE  # Auto-converted
 ```
 
-**Pattern manager (explicite) :**
+**Manager:**
 ```python
 from django_app_parameter.models import Parameter
-titre = Parameter.objects.str("BLOG_TITLE")
-annee = Parameter.objects.int("YEAR")
+title = Parameter.objects.str("BLOG_TITLE")
 ```
 
-**Pattern template (paramètres globaux) :**
+**Templates:**
 ```html
-<title>{{ BLOG_TITLE }}</title>
+<title>{{ BLOG_TITLE }}</title>  {# is_global=True only #}
 ```
 
-### 5. Génération automatique de slugs
-Les noms de paramètres sont automatiquement convertis en slugs uniques :
-- `"blog title"` → `"BLOG_TITLE"`
-- `"sender e-mail"` → `"SENDER_E_MAIL"`
-- Majuscules, underscores, caractères ASCII uniquement
+## Data Types
 
-### 6. Chargement en masse
-Commande de gestion pour charger plusieurs paramètres depuis JSON :
-```bash
-python manage.py load_param --file parameters.json
-```
+### Basic Types
+- **INT**: Integers
+- **STR**: Strings (default)
+- **FLT**: Floats
+- **DCL**: Decimals (exact precision for money)
+- **BOO**: Booleans
 
-### 7. Aucune dépendance externe
-Package minimaliste ne nécessitant que Django (3.2+).
+### Date/Time Types
+- **DATE**: Date (YYYY-MM-DD)
+- **DATETIME**: Date and time (ISO 8601)
+- **TIME**: Time (HH:MM:SS)
+- **DURATION**: Duration in seconds (as timedelta)
 
-### 8. Tests complets
-Couverture de tests à 100% avec pytest.
+### Validated Types
+- **URL**: Validated URL
+- **EMAIL**: Validated email
+- **PERCENTAGE**: Float validated 0-100
 
-## Cas d'usage typiques
+### Structured Types
+- **JSN**: JSON (any JSON structure)
+- **LIST**: Comma-separated list
+- **DICT**: JSON dictionary
+- **PATH**: File path (as Path object)
 
-### Configuration d'application
+## Validators
+
+Add validators to parameters for automatic validation:
+
 ```python
-app_parameter.API_ENDPOINT  # URL d'API externe
-app_parameter.MAX_UPLOAD_SIZE  # Taille max des uploads
-app_parameter.ITEMS_PER_PAGE  # Pagination
+param.validators.create(
+    validator_type="MinValueValidator",
+    validator_params={"limit_value": 0}
+)
 ```
 
-### Branding et contenu
+**Built-in validators:**
+- MinValueValidator, MaxValueValidator
+- MinLengthValidator, MaxLengthValidator
+- RegexValidator
+- EmailValidator, URLValidator
+- validate_slug, validate_ipv4_address, validate_ipv6_address
+- FileExtensionValidator
+
+**Custom validators** via `DJANGO_APP_PARAMETER['validators']` setting.
+
+See [models.py](../django_app_parameter/models.py) and [utils.py](../django_app_parameter/utils.py).
+
+## Setters
+
+Modify parameters with type-safe setters:
+
 ```python
-app_parameter.SITE_TITLE  # Titre du site
-app_parameter.FOOTER_TEXT  # Texte du footer
-app_parameter.CONTACT_EMAIL  # Email de contact
+param = Parameter.objects.get(slug="TAX_RATE")
+param.set(Decimal("19.6"))  # Validates + saves
 ```
 
-### Feature flags
-```python
-if app_parameter.MAINTENANCE_MODE:
-    return HttpResponse("Site en maintenance")
+Validators run automatically on `set()`.
 
-if app_parameter.ENABLE_BETA_FEATURE:
-    # Activer la fonctionnalité
-```
+## Data Model
 
-### Règles métier
-```python
-tax_rate = app_parameter.TAX_RATE  # Taux de TVA
-shipping_cost = app_parameter.SHIPPING_COST  # Frais de port
-discount = app_parameter.PROMO_DISCOUNT  # Réduction promotionnelle
-```
+See [models.py](../django_app_parameter/models.py):
 
-### Configuration email
-```python
-EMAIL_FROM = app_parameter.EMAIL_FROM_ADDRESS
-EMAIL_REPLY_TO = app_parameter.EMAIL_REPLY_TO
-```
-
-## Architecture de base
-
-```
-┌─────────────────┐
-│  Django Admin   │  ← Interface de gestion
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│ Parameter Model │  ← Stockage en BDD
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│ Manager / Proxy │  ← API d'accès
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│  Votre code     │  ← Utilisation
-└─────────────────┘
-```
-
-## Modèle de données
-
-Chaque paramètre est composé de :
-
-| Champ | Type | Description |
+**Parameter:**
+| Field | Type | Description |
 |-------|------|-------------|
-| `name` | CharField(100) | Nom lisible du paramètre |
-| `slug` | SlugField(40) | Identifiant unique (auto-généré) |
-| `value_type` | CharField(3) | Type de données (INT/STR/FLT/DCL/JSN/BOO) |
-| `value` | CharField(250) | Valeur stockée (chaîne de caractères) |
-| `description` | TextField | Description optionnelle |
-| `is_global` | BooleanField | Disponible dans les templates si True |
+| `name` | CharField(100) | Human-readable |
+| `slug` | SlugField(40) | Auto-generated ID |
+| `value_type` | CharField(3) | Type (readonly after creation) |
+| `value` | CharField(250) | Stored as string |
+| `description` | TextField | Optional |
+| `is_global` | BooleanField | Template access |
 
-## Workflow typique
+**ParameterValidator:**
+| Field | Type | Description |
+|-------|------|-------------|
+| `parameter` | ForeignKey | Parameter |
+| `validator_type` | CharField(400) | Validator name |
+| `validator_params` | JSONField | Validator params |
 
-1. **Création via l'admin** : Administrateur crée un paramètre avec un nom et une valeur
-2. **Slug automatique** : Le système génère un slug unique (ex: "BLOG_TITLE")
-3. **Stockage en BDD** : Valeur stockée comme chaîne de caractères
-4. **Accès dans le code** : `app_parameter.BLOG_TITLE`
-5. **Conversion de type** : Valeur automatiquement convertie selon `value_type`
-6. **Utilisation** : Valeur typée utilisée dans la logique applicative
+## Use Cases
 
-## Comparaison avec les alternatives
+- **Config**: API endpoints, max sizes, pagination
+- **Branding**: Site title, footer, contact
+- **Feature flags**: Maintenance mode, beta features
+- **Business rules**: Tax rates, shipping costs
+- **Dates**: Launch dates, expiration dates
+- **Durations**: Timeouts, session durations
 
-### vs. Django Settings
+## vs. Alternatives
 
-| Django Settings | App Parameter |
-|----------------|---------------|
-| Statique | Dynamique |
-| Nécessite redéploiement | Modifiable à chaud |
-| Type-safe avec IDE | Type-safe à l'exécution |
-| Fichier Python | Interface admin |
-| Gestion par environnement | Gestion par base de données |
+### vs. settings.py
+Static vs. Dynamic. Use settings for structure (DATABASES, MIDDLEWARE), app_parameter for business config.
 
-**Recommandation** : Utilisez settings.py pour la configuration structurelle (DATABASES, MIDDLEWARE), app_parameter pour la configuration métier modifiable.
-
-### vs. Variables d'environnement
-
-| Env Variables | App Parameter |
-|--------------|---------------|
-| Par environnement | Par base de données |
-| Configuration au déploiement | Configuration à l'exécution |
-| Secrets et credentials | Paramètres applicatifs |
-| Pas d'interface | Interface admin |
-
-**Recommandation** : Utilisez les variables d'environnement pour les secrets (API keys, passwords), app_parameter pour les paramètres métier.
+### vs. Env vars
+Use env vars for secrets (API keys, passwords), app_parameter for business params.
 
 ### vs. django-constance
+More features vs. Simpler. Use constance for advanced needs, app_parameter for simplicity.
 
-| django-constance | app_parameter |
-|-----------------|---------------|
-| Plus de features (Redis, validation) | Plus simple et léger |
-| Config globale | Paramètres illimités |
-| Backend configurable | SQLite/PostgreSQL/MySQL |
-| Plus mature | Plus récent |
+## Limits
 
-**Recommandation** : django-constance pour des besoins avancés, app_parameter pour la simplicité.
+1. **250 char limit**
+2. **DB query per access** (consider caching)
+3. **No encryption** (don't store secrets)
+4. **Templates: strings only**
 
-## Limites connues
+## Next
 
-1. **Limite de 250 caractères** par valeur (considérez un stockage externe pour les grandes données JSON)
-2. **Pas de validation de valeur** au niveau du modèle (validation à faire dans votre code)
-3. **Requête BDD par accès** (pensez au caching pour les paramètres fréquemment utilisés)
-4. **Pas de chiffrement** (ne stockez PAS de mots de passe ou clés API sensibles)
-5. **Templates : toujours des chaînes** (les paramètres globaux sont convertis en str dans les templates)
-
-## Philosophie de conception
-
-Django App Parameter suit la philosophie Django :
-
-- **Convention plutôt que configuration** : Fonctionne sans configuration supplémentaire
-- **Batteries incluses** : Tout ce dont vous avez besoin est inclus
-- **Simplicité** : API minimaliste et intuitive
-- **Don't Repeat Yourself** : Réutilise les patterns Django existants
-- **Explicit is better than implicit** : Types de données clairement définis
-
-## Prochaines étapes
-
-- [Installation et configuration](installation.md)
-- [Guide d'utilisation avec exemples](usage-guide.md)
-- [Référence complète de l'API](api-reference.md)
+- [Installation](installation.md)
+- [Usage Guide](usage-guide.md)
+- [Management Commands](management-commands.md)
