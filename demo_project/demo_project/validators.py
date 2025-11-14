@@ -16,9 +16,7 @@ def validate_business_hours(value: str) -> None:
     try:
         hour = int(value.split(":")[0])
     except (ValueError, IndexError) as e:
-        raise ValidationError(
-            f"Format invalide: {value}. Attendu: HH:MM:SS"
-        ) from e
+        raise ValidationError(f"Format invalide: {value}. Attendu: HH:MM:SS") from e
 
     if not (9 <= hour < 18):
         raise ValidationError(

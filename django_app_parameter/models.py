@@ -505,7 +505,7 @@ class Parameter(models.Model):
 
     def set_percentage(self, new_value: Any) -> None:
         """Set parameter value from percentage (validates 0-100)"""
-        if not isinstance(new_value, (float, int)):
+        if not isinstance(new_value, float | int):
             raise TypeError(f"Expected float or int, got {type(new_value).__name__}")
         if not 0 <= new_value <= 100:
             raise ValueError(f"Percentage must be between 0 and 100, got {new_value}")
@@ -538,8 +538,7 @@ class ParameterValidator(models.Model):
         default=dict,
         blank=True,
         help_text=(
-            "Paramètres JSON pour instancier le validateur "
-            "(ex: {'limit_value': 100})"
+            "Paramètres JSON pour instancier le validateur (ex: {'limit_value': 100})"
         ),
     )
 

@@ -72,7 +72,7 @@ class ParameterEditForm(forms.ModelForm):
 
             return value if isinstance(value, Decimal) else Decimal(str(value))
         elif value_type == Parameter.TYPES.PERCENTAGE.value:
-            return value if isinstance(value, (int, float)) else float(value)
+            return value if isinstance(value, int | float) else float(value)
         else:
             # For string-based types, use as-is
             return value

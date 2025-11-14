@@ -109,9 +109,7 @@ class TestImportValidator:
 
     def test_import_validator_class(self):
         """Test importing a class validator"""
-        ValidatorClass = import_validator(
-            "tests.test_validators.CustomRangeValidator"
-        )
+        ValidatorClass = import_validator("tests.test_validators.CustomRangeValidator")
         assert callable(ValidatorClass)
         assert ValidatorClass.__name__ == "CustomRangeValidator"
 
@@ -144,9 +142,7 @@ class TestGetValidatorFromRegistry:
     def test_get_custom_validator_from_settings(self, settings):
         """Test getting a custom validator from settings"""
         settings.DJANGO_APP_PARAMETER = {
-            "validators": {
-                "even_number": "tests.test_validators.validate_even_number"
-            }
+            "validators": {"even_number": "tests.test_validators.validate_even_number"}
         }
         clear_validator_cache()
 
@@ -165,9 +161,7 @@ class TestGetValidatorFromRegistry:
     def test_get_validator_caching(self, settings):
         """Test that validators are cached"""
         settings.DJANGO_APP_PARAMETER = {
-            "validators": {
-                "even_number": "tests.test_validators.validate_even_number"
-            }
+            "validators": {"even_number": "tests.test_validators.validate_even_number"}
         }
         clear_validator_cache()
 
@@ -181,9 +175,7 @@ class TestGetValidatorFromRegistry:
     def test_get_validator_no_cache(self, settings):
         """Test getting validator without cache"""
         settings.DJANGO_APP_PARAMETER = {
-            "validators": {
-                "even_number": "tests.test_validators.validate_even_number"
-            }
+            "validators": {"even_number": "tests.test_validators.validate_even_number"}
         }
         clear_validator_cache()
 
@@ -276,9 +268,7 @@ class TestClearValidatorCache:
     def test_clear_validator_cache(self, settings):
         """Test that clearing cache removes cached validators"""
         settings.DJANGO_APP_PARAMETER = {
-            "validators": {
-                "even_number": "tests.test_validators.validate_even_number"
-            }
+            "validators": {"even_number": "tests.test_validators.validate_even_number"}
         }
 
         # Load validator to cache it

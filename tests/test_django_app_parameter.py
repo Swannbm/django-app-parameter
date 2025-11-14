@@ -570,7 +570,7 @@ class TestLoadParamWithValidators:
                         {
                             "validator_type": "MaxValueValidator",
                             "validator_params": {"limit_value": 100},
-                        }
+                        },
                     ],
                 }
             ]

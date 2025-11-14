@@ -210,9 +210,7 @@ class TestParameterEditForm:
         )
 
         # Valid value
-        form = ParameterEditForm(
-            data={"name": "Test", "value": "50"}, instance=param
-        )
+        form = ParameterEditForm(data={"name": "Test", "value": "50"}, instance=param)
         assert form.is_valid()
 
         # Too low
@@ -220,9 +218,7 @@ class TestParameterEditForm:
         assert not form.is_valid()
 
         # Too high
-        form = ParameterEditForm(
-            data={"name": "Test", "value": "150"}, instance=param
-        )
+        form = ParameterEditForm(data={"name": "Test", "value": "150"}, instance=param)
         assert not form.is_valid()
 
     def test_clean_value_type_conversion_error(self):
@@ -294,9 +290,7 @@ class TestParameterValidatorForm:
     def test_validator_form_with_custom_validators(self, settings):
         """Test that custom validators appear in choices"""
         settings.DJANGO_APP_PARAMETER = {
-            "validators": {
-                "even_number": "tests.test_validators.validate_even_number"
-            }
+            "validators": {"even_number": "tests.test_validators.validate_even_number"}
         }
 
         form = ParameterValidatorForm()
