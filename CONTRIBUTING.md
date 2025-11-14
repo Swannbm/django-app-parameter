@@ -110,6 +110,45 @@ django-app-parameter/
 - ♻️ Refactoring
 - 🎨 Interface improvements (admin)
 
+## Manual Testing with Demo Project
+
+The `demo_project/` directory contains a complete Django application for manual testing of `django-app-parameter`. This is useful for:
+- Testing new features interactively
+- Reproducing bugs in a real Django environment
+- Validating admin interface changes
+- Testing parameter access in templates and views
+
+### Quick Start
+
+From the root of the repository:
+
+```bash
+./demo_project/run_demo.sh
+```
+
+This will automatically set up a fresh database and start the development server at http://127.0.0.1:8000/.
+
+### Important Notes
+
+**Fresh Setup Every Time**: The demo project is designed to be recreated from scratch each time:
+- The setup script (`setup_demo.sh`) removes the old database
+- A new SQLite database is created with migrations
+- A superuser is created (username: `admin`, password: `admin`)
+- Sample parameters are loaded from fixtures
+
+**Testing Workflow**:
+1. Make changes to the `django_app_parameter/` source code
+2. Run `./demo_project/run_demo.sh` to test your changes
+3. The demo loads your local version of the package (not the installed one)
+4. Test features via:
+   - Homepage: http://127.0.0.1:8000/ (global parameters in templates)
+   - Admin: http://127.0.0.1:8000/admin/ (CRUD operations)
+   - Django shell: `python manage.py shell` (programmatic access)
+
+**Fixtures**: Sample parameters are in [demo_project/fixtures/sample_parameters.json](demo_project/fixtures/sample_parameters.json). You can modify this file to test different parameter configurations.
+
+For more details, see [demo_project/README.md](demo_project/README.md).
+
 ## Resources
 
 - Test code: [tests/test_django_app_parameter.py](tests/test_django_app_parameter.py)
