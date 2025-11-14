@@ -1,13 +1,15 @@
-from decimal import Decimal
 import json
-import pytest
+from datetime import date, datetime, time, timedelta
+from decimal import Decimal
+from pathlib import Path
 
+import pytest
 from django.core.exceptions import ImproperlyConfigured
 from django.core.management import call_command
 
 from django_app_parameter import app_parameter
-from django_app_parameter.models import Parameter
 from django_app_parameter.context_processors import add_global_parameter_context
+from django_app_parameter.models import Parameter
 
 
 @pytest.fixture
@@ -59,7 +61,7 @@ class TestParameter:
         param = Parameter(
             name="testing",
             slug="TESTING",
-            value=1,
+            value="1",
         )
         result = param.str()
         assert isinstance(result, str)
@@ -132,10 +134,200 @@ class TestParameter:
         assert isinstance(result, bool)
         assert result is True
         assert isinstance(param.get(), bool)
-        param.value = "False"
+        param.value = "False"  # type: ignore[assignment]
         assert param.bool() is False
-        param.value = "0"
+        param.value = "0"  # type: ignore[assignment]
         assert param.bool() is False
+
+    def test_date(self):
+        param = Parameter(
+            name="testing",
+            slug="TESTING",
+            value="2024-03-15",
+            value_type=Parameter.TYPES.DATE,
+        )
+        result = param.date()
+        assert isinstance(result, date)
+        assert result == date(2024, 3, 15)
+        assert isinstance(param.get(), date)
+
+    def test_datetime(self):
+        param = Parameter(
+            name="testing",
+            slug="TESTING",
+            value="2024-03-15T14:30:00",
+            value_type=Parameter.TYPES.DATETIME,
+        )
+        result = param.datetime()
+        assert isinstance(result, datetime)
+        assert result == datetime(2024, 3, 15, 14, 30, 0)
+        assert isinstance(param.get(), datetime)
+
+    def test_time(self):
+        param = Parameter(
+            name="testing",
+            slug="TESTING",
+            value="14:30:00",
+            value_type=Parameter.TYPES.TIME,
+        )
+        result = param.time()
+        assert isinstance(result, time)
+        assert result == time(14, 30, 0)
+        assert isinstance(param.get(), time)
+
+    def test_url(self):
+        param = Parameter(
+            name="testing",
+            slug="TESTING",
+            value="https://example.com/api",
+            value_type=Parameter.TYPES.URL,
+        )
+        result = param.url()
+        assert isinstance(result, str)
+        assert result == "https://example.com/api"
+        assert isinstance(param.get(), str)
+
+    def test_url_invalid(self):
+        param = Parameter(
+            name="testing",
+            slug="TESTING",
+            value="not-a-valid-url",
+            value_type=Parameter.TYPES.URL,
+        )
+        with pytest.raises(ValueError, match="Invalid URL"):
+            param.url()
+
+    def test_email(self):
+        param = Parameter(
+            name="testing",
+            slug="TESTING",
+            value="admin@example.com",
+            value_type=Parameter.TYPES.EMAIL,
+        )
+        result = param.email()
+        assert isinstance(result, str)
+        assert result == "admin@example.com"
+        assert isinstance(param.get(), str)
+
+    def test_email_invalid(self):
+        param = Parameter(
+            name="testing",
+            slug="TESTING",
+            value="not-an-email",
+            value_type=Parameter.TYPES.EMAIL,
+        )
+        with pytest.raises(ValueError, match="Invalid email"):
+            param.email()
+
+    def test_list(self):
+        param = Parameter(
+            name="testing",
+            slug="TESTING",
+            value="item1, item2, item3",
+            value_type=Parameter.TYPES.LIST,
+        )
+        result = param.list()
+        assert isinstance(result, list)
+        assert result == ["item1", "item2", "item3"]
+        assert isinstance(param.get(), list)
+
+    def test_list_empty(self):
+        param = Parameter(
+            name="testing",
+            slug="TESTING",
+            value="",
+            value_type=Parameter.TYPES.LIST,
+        )
+        result = param.list()
+        assert result == []
+
+    def test_dict(self):
+        param = Parameter(
+            name="testing",
+            slug="TESTING",
+            value='{"key": "value", "count": 42}',
+            value_type=Parameter.TYPES.DICT,
+        )
+        result = param.dict()
+        assert isinstance(result, dict)
+        assert result == {"key": "value", "count": 42}
+        assert isinstance(param.get(), dict)
+
+    def test_dict_invalid_not_dict(self):
+        param = Parameter(
+            name="testing",
+            slug="TESTING",
+            value="[1, 2, 3]",
+            value_type=Parameter.TYPES.DICT,
+        )
+        with pytest.raises(ValueError, match="Expected dict"):
+            param.dict()
+
+    def test_path(self):
+        param = Parameter(
+            name="testing",
+            slug="TESTING",
+            value="/media/uploads/documents",
+            value_type=Parameter.TYPES.PATH,
+        )
+        result = param.path()
+        assert isinstance(result, Path)
+        assert result == Path("/media/uploads/documents")
+        assert isinstance(param.get(), Path)
+
+    def test_duration(self):
+        param = Parameter(
+            name="testing",
+            slug="TESTING",
+            value="3600",
+            value_type=Parameter.TYPES.DURATION,
+        )
+        result = param.duration()
+        assert isinstance(result, timedelta)
+        assert result == timedelta(seconds=3600)
+        assert isinstance(param.get(), timedelta)
+
+    def test_duration_float(self):
+        param = Parameter(
+            name="testing",
+            slug="TESTING",
+            value="3600.5",
+            value_type=Parameter.TYPES.DURATION,
+        )
+        result = param.duration()
+        assert result == timedelta(seconds=3600.5)
+
+    def test_percentage(self):
+        param = Parameter(
+            name="testing",
+            slug="TESTING",
+            value="75.5",
+            value_type=Parameter.TYPES.PERCENTAGE,
+        )
+        result = param.percentage()
+        assert isinstance(result, float)
+        assert result == 75.5
+        assert isinstance(param.get(), float)
+
+    def test_percentage_invalid_too_high(self):
+        param = Parameter(
+            name="testing",
+            slug="TESTING",
+            value="150",
+            value_type=Parameter.TYPES.PERCENTAGE,
+        )
+        with pytest.raises(ValueError, match="must be between 0 and 100"):
+            param.percentage()
+
+    def test_percentage_invalid_negative(self):
+        param = Parameter(
+            name="testing",
+            slug="TESTING",
+            value="-10",
+            value_type=Parameter.TYPES.PERCENTAGE,
+        )
+        with pytest.raises(ValueError, match="must be between 0 and 100"):
+            param.percentage()
 
 
 @pytest.mark.django_db
@@ -148,29 +340,6 @@ class TestParameterManager:
         assert params.int() == 1983
         with pytest.raises(ImproperlyConfigured):
             Parameter.objects.get_from_slug("NOT_EXISTING")
-
-    def test_create_or_update(self, params):
-        existing_param = {
-            "name": "year of birth",
-            "slug": "BIRTH_YEAR",
-            "value": "1984",
-        }
-        result = Parameter.objects.create_or_update(existing_param, update=False)
-        assert result == "Already exists"
-        result = Parameter.objects.create_or_update(existing_param)
-        assert result == "Already exists, updated"
-        new_param = {
-            "name": "day of birth",
-            "slug": "BIRTH_DAY",
-            "value": "27",
-            "value_type": Parameter.TYPES.INT,
-        }
-        result = Parameter.objects.create_or_update(new_param)
-        assert result == "Added"
-
-    def test_create_only_name(self):
-        result = Parameter.objects.create_or_update({"name": "only_name"})
-        assert result == "Added"
 
     def test_access(self, params):
         assert Parameter.objects.int("BIRTH_YEAR") == 1983

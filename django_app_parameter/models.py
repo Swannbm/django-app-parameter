@@ -1,12 +1,19 @@
 import json
+from datetime import date as date_type
+from datetime import datetime as datetime_type
+from datetime import time as time_type
+from datetime import timedelta
 from decimal import Decimal
+from pathlib import Path
+from typing import Any
 
-from django.core.exceptions import ImproperlyConfigured
+from django.core.exceptions import ImproperlyConfigured, ValidationError
+from django.core.validators import URLValidator, validate_email
 from django.db import models
 from django.utils.text import slugify
 
 
-def parameter_slugify(content):
+def parameter_slugify(content: str) -> str:
     """
     Transform content :
     * slugify (with django's function)
@@ -16,52 +23,70 @@ def parameter_slugify(content):
     return slugify(content).upper().replace("-", "_")
 
 
-class ParameterManager(models.Manager):
-    def get_from_slug(self, slug):
+# Type aliasing because there is method name conflict
+_str = str
+_list = list
+_dict = dict
+_float = float
+_datetime = datetime_type
+_time = time_type
+
+
+class ParameterManager(models.Manager["Parameter"]):
+    def get_from_slug(self, slug: _str) -> "Parameter":
         """Send ImproperlyConfigured exception if parameter is not in DB"""
         try:
             return super().get(slug=slug)
-        except Parameter.DoesNotExist as e:
+        except self.model.DoesNotExist as e:
             raise ImproperlyConfigured(f"{slug} parameters need to be set") from e
 
-    def int(self, slug):
+    def int(self, slug: _str) -> int:
         return self.get_from_slug(slug).int()
 
-    def float(self, slug):
+    def float(self, slug: _str) -> _float:
         return self.get_from_slug(slug).float()
 
-    def str(self, slug):
+    def str(self, slug: _str) -> _str:
         return self.get_from_slug(slug).str()
 
-    def decimal(self, slug):
+    def decimal(self, slug: _str) -> Decimal:
         return self.get_from_slug(slug).decimal()
 
-    def json(self, slug):
+    def json(self, slug: _str) -> Any:
         return self.get_from_slug(slug).json()
 
-    def bool(self, slug):
+    def bool(self, slug: _str) -> bool:
         return self.get_from_slug(slug).bool()
 
-    def create_or_update(self, parameter, update=True):
-        # add slug if not set
-        if "slug" not in parameter:
-            parameter["slug"] = parameter_slugify(parameter["name"])
-        try:
-            param = Parameter.objects.get(slug=parameter["slug"])
-            result = "Already exists"
-            if update:
-                param.name = parameter["name"]
-                param.value = parameter.get("value", "")
-                param.value_type = parameter.get("value_type", Parameter.TYPES.STR)
-                param.is_global = parameter.get("is_global", False)
-                param.description = parameter.get("description", "")
-                param.save()
-                result += ", updated"
-            return result
-        except Parameter.DoesNotExist:
-            param = Parameter(**parameter)
-            param.save()
-            return "Added"
+    def date(self, slug: _str) -> date_type:
+        return self.get_from_slug(slug).date()
+
+    def datetime(self, slug: _str) -> datetime_type:
+        return self.get_from_slug(slug).datetime()
+
+    def time(self, slug: _str) -> time_type:
+        return self.get_from_slug(slug).time()
+
+    def url(self, slug: _str) -> _str:
+        return self.get_from_slug(slug).url()
+
+    def email(self, slug: _str) -> _str:
+        return self.get_from_slug(slug).email()
+
+    def list(self, slug: _str) -> _list[_str]:
+        return self.get_from_slug(slug).list()
+
+    def dict(self, slug: _str) -> _dict[_str, Any]:
+        return self.get_from_slug(slug).dict()
+
+    def path(self, slug: _str) -> Path:
+        return self.get_from_slug(slug).path()
+
+    def duration(self, slug: _str) -> timedelta:
+        return self.get_from_slug(slug).duration()
+
+    def percentage(self, slug: _str) -> _float:
+        return self.get_from_slug(slug).percentage()
 
 
 class Parameter(models.Model):
@@ -74,6 +99,16 @@ class Parameter(models.Model):
         DCL = "DCL", "Nombre à virgule (Decimal)"
         JSN = "JSN", "JSON"
         BOO = "BOO", "Booléen"
+        DATE = "DATE", "Date (YYYY-MM-DD)"
+        DATETIME = "DTM", "Date et heure (ISO 8601)"
+        TIME = "TIME", "Heure (HH:MM:SS)"
+        URL = "URL", "URL validée"
+        EMAIL = "EML", "Email validé"
+        LIST = "LST", "Liste (séparée par virgules)"
+        DICT = "DCT", "Dictionnaire JSON"
+        PATH = "PTH", "Chemin de fichier"
+        DURATION = "DUR", "Durée (en secondes)"
+        PERCENTAGE = "PCT", "Pourcentage (0-100)"
 
     name = models.CharField("Nom", max_length=100)
     slug = models.SlugField(max_length=40, unique=True)
@@ -84,49 +119,120 @@ class Parameter(models.Model):
     value = models.CharField("Valeur", max_length=250)
     is_global = models.BooleanField(default=False)
 
-    def save(self, *args, **kwargs):
+    def save(self, *args: Any, **kwargs: Any) -> None:
         if not self.slug:
             self.slug = parameter_slugify(self.name)
         super().save(*args, **kwargs)
 
-    def get(self):
+    def get(self) -> Any:
         """Return parameter value casted accordingly to its value_type"""
-        functions = {
+        functions: dict[str, str] = {
             self.TYPES.INT: "int",
             self.TYPES.STR: "str",
             self.TYPES.FLT: "float",
             self.TYPES.DCL: "decimal",
             self.TYPES.JSN: "json",
             self.TYPES.BOO: "bool",
+            self.TYPES.DATE: "date",
+            self.TYPES.DATETIME: "datetime",
+            self.TYPES.TIME: "time",
+            self.TYPES.URL: "url",
+            self.TYPES.EMAIL: "email",
+            self.TYPES.LIST: "list",
+            self.TYPES.DICT: "dict",
+            self.TYPES.PATH: "path",
+            self.TYPES.DURATION: "duration",
+            self.TYPES.PERCENTAGE: "percentage",
         }
         function_name = functions.get(self.value_type, "str")
         return getattr(self, function_name)()
 
-    def int(self):
+    def int(self) -> int:
         """Return parameter value casted as int()"""
         return int(self.value)
 
-    def str(self):
+    def str(self) -> _str:
         """Return parameter value casted as str()"""
-        return str(self.value)
+        return self.value
 
-    def float(self):
+    def float(self) -> float:
         """Return parameter value casted as float()"""
         return float(self.value)
 
-    def decimal(self):
+    def decimal(self) -> Decimal:
         """Return parameter value casted as Decimal()"""
         return Decimal(self.value)
 
-    def json(self):
+    def json(self) -> Any:
         """Return parameter value casted as dict() using json lib"""
         return json.loads(self.value)
 
-    def bool(self):
+    def bool(self) -> bool:
         """Return parameter value casted as bool()"""
         if not self.value or self.value.lower() in ["false", "0"]:
             return False
         return bool(self.value)
 
-    def __str__(self):
-        return self.name
+    def date(self) -> date_type:
+        """Return parameter value casted as date() from ISO format YYYY-MM-DD"""
+        return datetime_type.fromisoformat(self.value.strip()).date()
+
+    def datetime(self) -> _datetime:
+        """Return parameter value casted as datetime() from ISO 8601 format"""
+        return _datetime.fromisoformat(self.value.strip())
+
+    def time(self) -> _time:
+        """Return parameter value casted as time() from HH:MM:SS format"""
+        return _datetime.strptime(self.value.strip(), "%H:%M:%S").time()
+
+    def url(self) -> _str:
+        """Return parameter value validated as URL"""
+        url_value = self.value.strip()
+        validator = URLValidator()
+        try:
+            validator(url_value)
+        except ValidationError as e:
+            raise ValueError(f"Invalid URL: {url_value}") from e
+        return url_value
+
+    def email(self) -> _str:
+        """Return parameter value validated as email"""
+        email_value = self.value.strip()
+        try:
+            validate_email(email_value)
+        except ValidationError as e:
+            raise ValueError(f"Invalid email: {email_value}") from e
+        return email_value
+
+    def list(self) -> _list[_str]:
+        """Return parameter value as list split by comma"""
+        value_str = self.value.strip()
+        if not value_str:
+            return []
+        return [item.strip() for item in value_str.split(",")]
+
+    def dict(self) -> _dict[_str, Any]:
+        """Return parameter value as dict from JSON"""
+        result = json.loads(self.value)
+        if not isinstance(result, _dict):
+            raise ValueError(f"Expected dict, got {type(result).__name__}")
+        return result  # type: ignore[return-value]
+
+    def path(self) -> Path:
+        """Return parameter value as Path object"""
+        return Path(self.value.strip())
+
+    def duration(self) -> timedelta:
+        """Return parameter value as timedelta from seconds"""
+        seconds = _float(self.value)
+        return timedelta(seconds=seconds)
+
+    def percentage(self) -> _float:
+        """Return parameter value as percentage (validated 0-100)"""
+        value = _float(self.value)
+        if not 0 <= value <= 100:
+            raise ValueError(f"Percentage must be between 0 and 100, got {value}")
+        return value
+
+    def __str__(self) -> _str:
+        return str(self.name)
