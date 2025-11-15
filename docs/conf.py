@@ -9,6 +9,28 @@ from datetime import datetime
 # Add the project root to the Python path so Sphinx can find the package
 sys.path.insert(0, os.path.abspath(".."))
 
+# Configure Django settings for Sphinx autodoc
+import django
+from django.conf import settings
+
+if not settings.configured:
+    settings.configure(
+        DEBUG=True,
+        DATABASES={
+            "default": {
+                "ENGINE": "django.db.backends.sqlite3",
+                "NAME": ":memory:",
+            }
+        },
+        INSTALLED_APPS=[
+            "django.contrib.contenttypes",
+            "django.contrib.auth",
+            "django_app_parameter",
+        ],
+        SECRET_KEY="fake-secret-key-for-sphinx-docs",
+    )
+    django.setup()
+
 # -- Project information -----------------------------------------------------
 project = "django-app-parameter"
 copyright = f"{datetime.now().year}, Swann Bouvier-Muller"
