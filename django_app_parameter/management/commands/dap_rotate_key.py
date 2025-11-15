@@ -18,17 +18,35 @@ Arguments:
     --backup-file: Path to backup file (default: dap_backup_key.json at project root)
 """
 
+from __future__ import annotations
+
 import json
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Any, TypedDict
+from typing import TYPE_CHECKING, Any
 
 from django.core.exceptions import ImproperlyConfigured
 from django.core.management.base import BaseCommand, CommandParser
 
 from django_app_parameter.models import Parameter
 from django_app_parameter.utils import decrypt_value, encrypt_value, get_setting
+
+if TYPE_CHECKING:
+    from typing_extensions import TypedDict
+
+    class KeyBackupEntry(TypedDict):
+        """Structure for a single key backup entry."""
+
+        timestamp: str
+        key: str
+        parameters_count: int
+
+    class BackupData(TypedDict):
+        """Structure for the backup file."""
+
+        keys: list[KeyBackupEntry]
+
 
 try:
     from cryptography.fernet import Fernet, InvalidToken
@@ -39,20 +57,6 @@ except ImportError:
 HAS_CRYPTOGRAPHY = Fernet is not None
 
 logger = logging.getLogger(__name__)
-
-
-class KeyBackupEntry(TypedDict):
-    """Structure for a single key backup entry."""
-
-    timestamp: str
-    key: str
-    parameters_count: int
-
-
-class BackupData(TypedDict):
-    """Structure for the backup file."""
-
-    keys: list[KeyBackupEntry]
 
 
 class Command(BaseCommand):
@@ -136,7 +140,7 @@ class Command(BaseCommand):
         timestamp = datetime.now().isoformat()
 
         # Load existing backup file or create new structure
-        backup_data: BackupData
+        backup_data: dict[str, Any]
         if backup_file.exists():
             with backup_file.open("r") as f:
                 backup_data = json.load(f)
@@ -157,9 +161,7 @@ class Command(BaseCommand):
         with backup_file.open("w") as f:
             json.dump(backup_data, f, indent=4)
 
-        self.stdout.write(
-            self.style.SUCCESS(f"✓ Backed up old key to: {backup_file}")
-        )
+        self.stdout.write(self.style.SUCCESS(f"✓ Backed up old key to: {backup_file}"))
         self.stdout.write(self.style.SUCCESS("✓ Generated new encryption key\n"))
 
         # Display new key
@@ -172,9 +174,7 @@ class Command(BaseCommand):
             "1. Update your settings with the new key:\n"
             f"   DJANGO_APP_PARAMETER = {{'encryption_key': '{new_key_str}'}}\n"
         )
-        self.stdout.write(
-            "2. Restart your application to use the new key\n"
-        )
+        self.stdout.write("2. Restart your application to use the new key\n")
         self.stdout.write(
             "3. Once settings are updated, run:\n"
             f"   python manage.py dap_rotate_key --old-key {current_key_str}\n"
@@ -182,18 +182,14 @@ class Command(BaseCommand):
 
     def _apply_rotation(self, old_key_str: str, backup_file: Path) -> None:
         """Step 2: Re-encrypt parameters with new key from settings."""
-        self.stdout.write(
-            self.style.HTTP_INFO("=== Step 2: Apply rotation ===\n")
-        )
+        self.stdout.write(self.style.HTTP_INFO("=== Step 2: Apply rotation ===\n"))
 
         # Validate old key
         try:
             old_key = old_key_str.encode("utf-8")
             Fernet(old_key)  # type: ignore[misc]  # Validate Fernet key format
         except Exception as e:
-            self.stdout.write(
-                self.style.ERROR(f"Invalid old key provided: {e}")
-            )
+            self.stdout.write(self.style.ERROR(f"Invalid old key provided: {e}"))
             return
 
         # Get new key from settings
@@ -254,9 +250,7 @@ class Command(BaseCommand):
                 logger.debug("Re-encrypted parameter: %s", param.slug)
 
             except InvalidToken:  # type: ignore[misc]
-                failed_params.append(
-                    f"{param.slug} (failed to decrypt with old key)"
-                )
+                failed_params.append(f"{param.slug} (failed to decrypt with old key)")
                 logger.error("Failed to decrypt parameter %s with old key", param.slug)
             except Exception as e:
                 failed_params.append(f"{param.slug} ({e})")
@@ -279,16 +273,10 @@ class Command(BaseCommand):
             for failed in failed_params:
                 self.stdout.write(f"  - {failed}")
             self.stdout.write(
-                self.style.WARNING(
-                    f"\nCheck backup file for recovery: {backup_file}"
-                )
+                self.style.WARNING(f"\nCheck backup file for recovery: {backup_file}")
             )
         else:
             self.stdout.write(
-                self.style.SUCCESS(
-                    "\n✓ Rotation completed successfully!"
-                )
+                self.style.SUCCESS("\n✓ Rotation completed successfully!")
             )
-            self.stdout.write(
-                f"Backup file available at: {backup_file}"
-            )
+            self.stdout.write(f"Backup file available at: {backup_file}")
