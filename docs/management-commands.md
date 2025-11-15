@@ -351,44 +351,93 @@ Track parameter changes in git (exclude sensitive params).
 
 ## dap_rotate_key
 
-Rotate encryption key for encrypted parameters.
+Rotate encryption key for encrypted parameters (two-step process).
+
+> **Note**: For encryption setup and basic usage, see the [Encryption](../README.md#encryption) section in the main README.
 
 ### Syntax
 
+**Step 1: Generate new key and backup**
 ```bash
-python manage.py dap_rotate_key [--new-key <key>] [--backup-dir <path>]
+python manage.py dap_rotate_key [--backup-file <path>]
+```
+
+**Step 2: Apply rotation**
+```bash
+python manage.py dap_rotate_key --old-key <key> [--backup-file <path>]
 ```
 
 ### Options
 
-- `--new-key <key>`: New encryption key (base64). Auto-generated if omitted.
-- `--backup-dir <path>`: Backup directory for old key (default: current directory)
+- `--old-key <key>`: Old encryption key for decryption. When provided, performs step 2.
+- `--backup-file <path>`: Path to backup file (default: `dap_backup_key.json` at project root)
 
 ### Examples
 
+**Step 1: Generate new key**
 ```bash
-# Auto-generate new key
+# Generate new key and backup old one
 python manage.py dap_rotate_key
 
-# Use specific key
-python manage.py dap_rotate_key --new-key <base64-key>
+# With custom backup location
+python manage.py dap_rotate_key --backup-file /path/to/backup.json
+```
 
-# Custom backup location
-python manage.py dap_rotate_key --backup-dir /backups
+Output shows:
+- The new encryption key to add to settings
+- Command for step 2
+
+**Step 2: Apply rotation**
+```bash
+# After updating settings with new key
+python manage.py dap_rotate_key --old-key <old-key-from-step1>
 ```
 
 ### Process
 
-1. Decrypts all encrypted parameters
-2. Backs up current key with timestamp
-3. Re-encrypts with new key
-4. Prompts for confirmation
+**Step 1:**
+1. Reads current key from settings
+2. Generates new encryption key
+3. Backs up old key to `dap_backup_key.json` (appends with timestamp)
+4. Displays new key and instructions
 
-See [Encryption](encryption.md) for setup and usage.
+**Step 2:**
+1. Validates old key (from parameter) and new key (from settings)
+2. Decrypts all encrypted parameters with old key
+3. Re-encrypts with new key from settings
+4. Saves updated parameters
+
+### Backup File Format
+
+```json
+{
+  "keys": [
+    {
+      "timestamp": "2024-11-14T15:30:00",
+      "key": "old_key_base64...",
+      "parameters_count": 5
+    }
+  ]
+}
+```
+
+### Custom Backup Location
+
+Via settings:
+```python
+DJANGO_APP_PARAMETER = {
+    'encryption_key': '...',
+    'encryption_key_backup_file': '/secure/location/dap_backup_key.json'
+}
+```
+
+Or via command option:
+```bash
+python manage.py dap_rotate_key --backup-file /path/to/backup.json
+```
 
 ## Next
 
-- [Encryption](encryption.md)
 - [Usage Guide](usage-guide.md)
 - [FAQ](faq.md)
 - [Command implementations](../django_app_parameter/management/commands/)

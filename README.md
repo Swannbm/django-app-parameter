@@ -159,7 +159,6 @@ Enjoy.
 ## Ideas which could come later (or not)
 
 * [] modifications history
-* [] Enable cyphering
 
 If you have new idea you would like to see, feel free to open a new issue in this repo.
 
