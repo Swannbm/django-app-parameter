@@ -1,15 +1,15 @@
 # Management Commands
 
-## load_param
+## dap_load
 
 Import parameters from JSON file or string.
 
 ### Syntax
 
 ```bash
-python manage.py load_param --file <path>
-python manage.py load_param --json '<json>'
-python manage.py load_param --no-update --file <path>
+python manage.py dap_load --file <path>
+python manage.py dap_load --json '<json>'
+python manage.py dap_load --no-update --file <path>
 ```
 
 ### Options
@@ -22,13 +22,13 @@ python manage.py load_param --no-update --file <path>
 
 ```bash
 # Import from file
-python manage.py load_param --file parameters.json
+python manage.py dap_load --file parameters.json
 
 # Import without overwriting existing
-python manage.py load_param --no-update --file defaults.json
+python manage.py dap_load --no-update --file defaults.json
 
 # Import from JSON string
-python manage.py load_param --json '[{"name": "Site Title", "value": "My Site"}]'
+python manage.py dap_load --json '[{"name": "Site Title", "value": "My Site"}]'
 ```
 
 ### JSON Format
@@ -250,7 +250,7 @@ See [utils.py](../django_app_parameter/utils.py) for validator registry implemen
 ```bash
 #!/bin/bash
 python manage.py migrate
-python manage.py load_param --no-update --file config/defaults.json
+python manage.py dap_load --no-update --file config/defaults.json
 python manage.py collectstatic --noinput
 gunicorn myproject.wsgi
 ```
@@ -258,20 +258,20 @@ gunicorn myproject.wsgi
 #### Environment Migration
 ```bash
 # Export from staging
-python manage.py dump_param staging_params.json
+python manage.py dap_dump staging_params.json
 
 # Import to production (without overwriting)
-python manage.py load_param --no-update --file staging_params.json
+python manage.py dap_load --no-update --file staging_params.json
 ```
 
-## dump_param
+## dap_dump
 
 Export all parameters to JSON file.
 
 ### Syntax
 
 ```bash
-python manage.py dump_param <file> [--indent N]
+python manage.py dap_dump <file> [--indent N]
 ```
 
 ### Arguments
@@ -283,13 +283,13 @@ python manage.py dump_param <file> [--indent N]
 
 ```bash
 # Export to file
-python manage.py dump_param backup.json
+python manage.py dap_dump backup.json
 
 # Export with no indentation (compact)
-python manage.py dump_param backup.json --indent 0
+python manage.py dap_dump backup.json --indent 0
 
 # Export with 2-space indentation
-python manage.py dump_param backup.json --indent 2
+python manage.py dap_dump backup.json --indent 2
 ```
 
 ### Output Format
@@ -337,7 +337,7 @@ Includes all fields and validators:
 
 **Backup:**
 ```bash
-python manage.py dump_param backup_$(date +%Y%m%d).json
+python manage.py dap_dump backup_$(date +%Y%m%d).json
 ```
 
 **Documentation:**
@@ -348,6 +348,93 @@ Export from one environment, import to another.
 
 **Version Control:**
 Track parameter changes in git (exclude sensitive params).
+
+## dap_rotate_key
+
+Rotate encryption key for encrypted parameters (two-step process).
+
+> **Note**: For encryption setup and basic usage, see the [Encryption](../README.md#encryption) section in the main README.
+
+### Syntax
+
+**Step 1: Generate new key and backup**
+```bash
+python manage.py dap_rotate_key [--backup-file <path>]
+```
+
+**Step 2: Apply rotation**
+```bash
+python manage.py dap_rotate_key --old-key <key> [--backup-file <path>]
+```
+
+### Options
+
+- `--old-key <key>`: Old encryption key for decryption. When provided, performs step 2.
+- `--backup-file <path>`: Path to backup file (default: `dap_backup_key.json` at project root)
+
+### Examples
+
+**Step 1: Generate new key**
+```bash
+# Generate new key and backup old one
+python manage.py dap_rotate_key
+
+# With custom backup location
+python manage.py dap_rotate_key --backup-file /path/to/backup.json
+```
+
+Output shows:
+- The new encryption key to add to settings
+- Command for step 2
+
+**Step 2: Apply rotation**
+```bash
+# After updating settings with new key
+python manage.py dap_rotate_key --old-key <old-key-from-step1>
+```
+
+### Process
+
+**Step 1:**
+1. Reads current key from settings
+2. Generates new encryption key
+3. Backs up old key to `dap_backup_key.json` (appends with timestamp)
+4. Displays new key and instructions
+
+**Step 2:**
+1. Validates old key (from parameter) and new key (from settings)
+2. Decrypts all encrypted parameters with old key
+3. Re-encrypts with new key from settings
+4. Saves updated parameters
+
+### Backup File Format
+
+```json
+{
+  "keys": [
+    {
+      "timestamp": "2024-11-14T15:30:00",
+      "key": "old_key_base64...",
+      "parameters_count": 5
+    }
+  ]
+}
+```
+
+### Custom Backup Location
+
+Via settings:
+```python
+DJANGO_APP_PARAMETER = {
+    'encryption_key': '...',
+    'encryption_key_backup_file': '/secure/location/dap_backup_key.json'
+}
+```
+
+Or via command option:
+```bash
+python manage.py dap_rotate_key --backup-file /path/to/backup.json
+```
 
 ## Next
 

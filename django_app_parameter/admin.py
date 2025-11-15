@@ -26,11 +26,19 @@ class ParameterCreateForm(forms.ModelForm):
 
     class Meta:
         model = Parameter
-        fields = ["name", "slug", "value_type", "description", "is_global"]
+        fields = [
+            "name",
+            "slug",
+            "value_type",
+            "description",
+            "is_global",
+            "enable_cypher",
+        ]
         help_texts = {
             "name": "Nom du paramètre",
             "slug": "Laissez vide pour générer automatiquement depuis le nom",
             "value_type": "Le type ne pourra plus être modifié après création",
+            "enable_cypher": "Si activé, la valeur sera chiffrée en base de données",
         }
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
@@ -45,7 +53,7 @@ class ParameterEditForm(forms.ModelForm):
 
     class Meta:
         model = Parameter
-        fields = ["name", "description", "value", "is_global"]
+        fields = ["name", "description", "value", "is_global", "enable_cypher"]
 
     def _convert_value_to_type(self, value: Any, value_type: str) -> Any:
         """Convert a value to its appropriate type for validation.
@@ -177,8 +185,9 @@ class ParameterAdmin(_ModelAdmin):
         "slug",
         "value",
         "value_type",
+        "enable_cypher",
     )
-    list_filter = ("value_type", "is_global")
+    list_filter = ("value_type", "is_global", "enable_cypher")
     search_fields = (
         "name",
         "slug",

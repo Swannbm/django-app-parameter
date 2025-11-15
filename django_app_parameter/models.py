@@ -1,29 +1,54 @@
+from __future__ import annotations
+
 import json
 import logging
+from collections.abc import Callable
 from datetime import date as date_type
 from datetime import datetime as datetime_type
 from datetime import time as time_type
 from datetime import timedelta
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Callable, cast  # noqa: UP035
+from typing import Any, TypedDict, cast
 
 from django.core.exceptions import ImproperlyConfigured, ValidationError
 from django.core.validators import URLValidator, validate_email
 from django.db import models
-from django.utils.text import slugify
+
+from django_app_parameter.utils import (
+    decrypt_value,
+    encrypt_value,
+    get_available_validators,
+    get_validator_from_registry,
+    parameter_slugify,
+)
+
+
+class ValidatorDict(TypedDict):
+    """Structure for validator data in JSON export/import"""
+
+    validator_type: str
+    validator_params: dict[str, Any]
+
+
+class _ParameterDictRequired(TypedDict):
+    """Required fields for ParameterDict"""
+
+    name: str
+    slug: str
+    value: str
+    value_type: str
+    description: str
+    is_global: bool
+
+
+class ParameterDict(_ParameterDictRequired, total=False):
+    """Structure for parameter data in JSON export/import"""
+
+    validators: list[ValidatorDict]
+
 
 logger = logging.getLogger(__name__)
-
-
-def parameter_slugify(content: str) -> str:
-    """
-    Transform content :
-    * slugify (with django's function)
-    * upperise
-    * replace dash (-) with underscore (_)
-    """
-    return slugify(content).upper().replace("-", "_")
 
 
 # Type aliasing because there is method name conflict
@@ -38,7 +63,7 @@ _time = time_type
 
 
 class ParameterManager(models.Manager["Parameter"]):
-    def get_from_slug(self, slug: _str) -> "Parameter":
+    def get_from_slug(self, slug: _str) -> Parameter:
         """Send ImproperlyConfigured exception if parameter is not in DB"""
         try:
             return super().get(slug=slug)
@@ -104,104 +129,45 @@ class ParameterManager(models.Manager["Parameter"]):
         logger.info("load json")
         for param_values in data:
             # Make a copy to avoid modifying the original data
-            param_values = dict(param_values)
+            param_dict = cast(ParameterDict, dict(param_values))
 
-            if "slug" in param_values:
-                slug = param_values["slug"]
+            if "slug" in param_dict:
+                slug = param_dict["slug"]
             else:
-                slug = parameter_slugify(param_values["name"])
-
-            # Extract validators from param_values if present
-            validators_data = param_values.pop("validators", None)
+                slug = parameter_slugify(param_dict["name"])
 
             if do_update:
                 logger.info("Updating parameter %s", slug)
-                param, _ = self.update_or_create(slug=slug, defaults=param_values)
+                # Try to get existing parameter or create new one
+                try:
+                    param = self.get(slug=slug)
+                    param.from_dict(param_dict)
+                except self.model.DoesNotExist:
+                    # Create new parameter
+                    param = self.model()
+                    param.from_dict(param_dict)
             else:
                 logger.info("Adding parameter %s (no update)", slug)
-                param, _ = self.get_or_create(slug=slug, defaults=param_values)
+                # Only create if doesn't exist
+                try:
+                    param = self.get(slug=slug)
+                    # Already exists, skip
+                except self.model.DoesNotExist:
+                    # Create new parameter
+                    param = self.model()
+                    param.from_dict(param_dict)
 
-            # Handle validators - always process to ensure consistency
-            self._handle_validators(param, validators_data)
-
-    def _handle_validators(
-        self, parameter: "Parameter", validators_data: _list[_dict[_str, Any]] | None
-    ) -> None:
-        """Handle creation/update of validators for a parameter.
-
-        The validators in the JSON represent the desired final state.
-        All existing validators are removed and replaced with the ones from JSON.
-        If validators_data is None or empty, all validators are removed.
-
-        Args:
-            parameter: The Parameter instance to attach validators to
-            validators_data: List of validator definitions from JSON, or None
-        """
-        # Always clear existing validators first to ensure consistency
-        logger.info("Clearing existing validators for parameter %s", parameter.slug)
-        existing_parameters = parameter.validators.all()  # type: ignore[attr-defined]
-        existing_parameters.delete()  # type: ignore[misc]
-
-        # If no validators provided, we're done (validators are already cleared)
-        if not validators_data:
-            return
-
-        # Create new validators from JSON
-        for validator_data in validators_data:
-            validator_type = validator_data.get("validator_type")
-            validator_params = validator_data.get("validator_params", {})
-
-            if not validator_type:
-                logger.warning(
-                    "Skipping validator without validator_type for parameter %s",
-                    parameter.slug,
-                )
-                continue
-
-            # Create validator
-            logger.info(
-                "Creating validator %s for parameter %s",
-                validator_type,
-                parameter.slug,
-            )
-            parameter.validators.create(  # type: ignore[attr-defined]
-                validator_type=validator_type,
-                validator_params=validator_params,
-            )
-
-    def dump_to_json(self) -> _list[_dict[_str, Any]]:
+    def dump_to_json(self) -> list[ParameterDict]:
         """Export all parameters to JSON-compatible format.
 
         Returns:
             List of parameter dictionaries with all fields and validators
         """
         logger.info("Dumping parameters to JSON")
-        result: _list[_dict[_str, Any]] = []
+        result: list[ParameterDict] = []
 
         for param in self.all():
-            param_data: _dict[_str, Any] = {
-                "name": param.name,
-                "slug": param.slug,
-                "value": param.value,
-                "value_type": param.value_type,
-                "description": param.description,
-                "is_global": param.is_global,
-            }
-
-            # Add validators if any
-            validators_qs = param.validators.all()  # type: ignore[attr-defined]
-            if validators_qs.exists():  # type: ignore[attr-defined]
-                validators: _list[_dict[_str, Any]] = []
-                for validator in validators_qs:  # type: ignore[attr-defined]
-                    validators.append(
-                        {
-                            "validator_type": validator.validator_type,  # type: ignore[attr-defined]
-                            "validator_params": validator.validator_params,  # type: ignore[attr-defined]
-                        }
-                    )
-                param_data["validators"] = validators
-
-            result.append(param_data)
+            result.append(param.to_dict())
 
         logger.info("Dumped %d parameters", len(result))
         return result
@@ -236,11 +202,39 @@ class Parameter(models.Model):
     description = models.TextField("Description", blank=True)
     value = models.CharField("Valeur", max_length=250)
     is_global = models.BooleanField(default=False)
+    enable_cypher = models.BooleanField(
+        "Chiffrement activé",
+        default=False,
+        help_text="Si activé, la valeur sera chiffrée en base de données",
+    )
 
     def save(self, *args: Any, **kwargs: Any) -> None:
         if not self.slug:
             self.slug = parameter_slugify(self.name)
         super().save(*args, **kwargs)
+
+    def _get_raw_value(self) -> _str:
+        """
+        Get the raw value, decrypting it if enable_cypher is True.
+
+        Returns:
+            The decrypted value if enable_cypher is True, otherwise the raw value
+        """
+        if self.enable_cypher:
+            return decrypt_value(self.value)
+        return self.value
+
+    def _set_raw_value(self, value: _str) -> None:
+        """
+        Set the raw value, encrypting it if enable_cypher is True.
+
+        Args:
+            value: The plaintext value to store (will be encrypted if needed)
+        """
+        if self.enable_cypher:
+            self.value = encrypt_value(value)
+        else:
+            self.value = value
 
     def get(self) -> Any:
         """Return parameter value casted accordingly to its value_type"""
@@ -267,45 +261,46 @@ class Parameter(models.Model):
 
     def int(self) -> int:
         """Return parameter value casted as int()"""
-        return int(self.value)
+        return int(self._get_raw_value())
 
     def str(self) -> _str:
         """Return parameter value casted as str()"""
-        return self.value
+        return self._get_raw_value()
 
     def float(self) -> float:
         """Return parameter value casted as float()"""
-        return float(self.value)
+        return float(self._get_raw_value())
 
     def decimal(self) -> Decimal:
         """Return parameter value casted as Decimal()"""
-        return Decimal(self.value)
+        return Decimal(self._get_raw_value())
 
     def json(self) -> Any:
         """Return parameter value casted as dict() using json lib"""
-        return json.loads(self.value)
+        return json.loads(self._get_raw_value())
 
     def bool(self) -> bool:
         """Return parameter value casted as bool()"""
-        if not self.value or self.value.lower() in ["false", "0"]:
+        raw_value = self._get_raw_value()
+        if not raw_value or raw_value.lower() in ["false", "0"]:
             return False
-        return bool(self.value)
+        return bool(raw_value)
 
     def date(self) -> date_type:
         """Return parameter value casted as date() from ISO format YYYY-MM-DD"""
-        return datetime_type.fromisoformat(self.value.strip()).date()
+        return datetime_type.fromisoformat(self._get_raw_value().strip()).date()
 
     def datetime(self) -> _datetime:
         """Return parameter value casted as datetime() from ISO 8601 format"""
-        return _datetime.fromisoformat(self.value.strip())
+        return _datetime.fromisoformat(self._get_raw_value().strip())
 
     def time(self) -> _time:
         """Return parameter value casted as time() from HH:MM:SS format"""
-        return _datetime.strptime(self.value.strip(), "%H:%M:%S").time()
+        return _datetime.strptime(self._get_raw_value().strip(), "%H:%M:%S").time()
 
     def url(self) -> _str:
         """Return parameter value validated as URL"""
-        url_value = self.value.strip()
+        url_value = self._get_raw_value().strip()
         validator = URLValidator()
         try:
             validator(url_value)
@@ -315,7 +310,7 @@ class Parameter(models.Model):
 
     def email(self) -> _str:
         """Return parameter value validated as email"""
-        email_value = self.value.strip()
+        email_value = self._get_raw_value().strip()
         try:
             validate_email(email_value)
         except ValidationError as e:
@@ -324,30 +319,30 @@ class Parameter(models.Model):
 
     def list(self) -> _list[_str]:
         """Return parameter value as list split by comma"""
-        value_str = self.value.strip()
+        value_str = self._get_raw_value().strip()
         if not value_str:
             return []
         return [item.strip() for item in value_str.split(",")]
 
     def dict(self) -> _dict[_str, Any]:
         """Return parameter value as dict from JSON"""
-        result = json.loads(self.value)
+        result = json.loads(self._get_raw_value())
         if not isinstance(result, _dict):
             raise ValueError(f"Expected dict, got {type(result).__name__}")
         return result  # type: ignore[return-value]
 
     def path(self) -> Path:
         """Return parameter value as Path object"""
-        return Path(self.value.strip())
+        return Path(self._get_raw_value().strip())
 
     def duration(self) -> timedelta:
         """Return parameter value as timedelta from seconds"""
-        seconds = _float(self.value)
+        seconds = _float(self._get_raw_value())
         return timedelta(seconds=seconds)
 
     def percentage(self) -> _float:
         """Return parameter value as percentage (validated 0-100)"""
-        value = _float(self.value)
+        value = _float(self._get_raw_value())
         if not 0 <= value <= 100:
             raise ValueError(f"Percentage must be between 0 and 100, got {value}")
         return value
@@ -392,61 +387,62 @@ class Parameter(models.Model):
         """Set parameter value from int"""
         if not isinstance(new_value, int):
             raise TypeError(f"Expected int, got {type(new_value).__name__}")
-        self.value = _str(new_value)
+        self._run_validators(new_value)
+        self._set_raw_value(_str(new_value))
         self.save()
 
     def set_str(self, new_value: Any) -> None:
         """Set parameter value from str"""
         if not isinstance(new_value, str):
             raise TypeError(f"Expected str, got {type(new_value).__name__}")
-        self.value = new_value
+        self._set_raw_value(new_value)
         self.save()
 
     def set_float(self, new_value: Any) -> None:
         """Set parameter value from float"""
         if not isinstance(new_value, float):
             raise TypeError(f"Expected float, got {type(new_value).__name__}")
-        self.value = _str(new_value)
+        self._set_raw_value(_str(new_value))
         self.save()
 
     def set_decimal(self, new_value: Any) -> None:
         """Set parameter value from Decimal"""
         if not isinstance(new_value, Decimal):
             raise TypeError(f"Expected Decimal, got {type(new_value).__name__}")
-        self.value = _str(new_value)
+        self._set_raw_value(_str(new_value))
         self.save()
 
     def set_json(self, new_value: Any) -> None:
         """Set parameter value from JSON-serializable object"""
-        self.value = json.dumps(new_value)
+        self._set_raw_value(json.dumps(new_value))
         self.save()
 
     def set_bool(self, new_value: Any) -> None:
         """Set parameter value from bool"""
         if not isinstance(new_value, bool):
             raise TypeError(f"Expected bool, got {type(new_value).__name__}")
-        self.value = "1" if new_value else "0"
+        self._set_raw_value("1" if new_value else "0")
         self.save()
 
     def set_date(self, new_value: Any) -> None:
         """Set parameter value from date object"""
         if not isinstance(new_value, date_type):
             raise TypeError(f"Expected date, got {type(new_value).__name__}")
-        self.value = new_value.isoformat()
+        self._set_raw_value(new_value.isoformat())
         self.save()
 
     def set_datetime(self, new_value: Any) -> None:
         """Set parameter value from datetime object"""
         if not isinstance(new_value, datetime_type):
             raise TypeError(f"Expected datetime, got {type(new_value).__name__}")
-        self.value = new_value.isoformat()
+        self._set_raw_value(new_value.isoformat())
         self.save()
 
     def set_time(self, new_value: Any) -> None:
         """Set parameter value from time object"""
         if not isinstance(new_value, time_type):
             raise TypeError(f"Expected time, got {type(new_value).__name__}")
-        self.value = new_value.strftime("%H:%M:%S")
+        self._set_raw_value(new_value.strftime("%H:%M:%S"))
         self.save()
 
     def set_url(self, new_value: Any) -> None:
@@ -459,7 +455,7 @@ class Parameter(models.Model):
             validator(url_value)
         except ValidationError as e:
             raise ValueError(f"Invalid URL: {url_value}") from e
-        self.value = url_value
+        self._set_raw_value(url_value)
         self.save()
 
     def set_email(self, new_value: Any) -> None:
@@ -471,7 +467,7 @@ class Parameter(models.Model):
             validate_email(email_value)
         except ValidationError as e:
             raise ValueError(f"Invalid email: {email_value}") from e
-        self.value = email_value
+        self._set_raw_value(email_value)
         self.save()
 
     def set_list(self, new_value: Any) -> None:
@@ -479,28 +475,28 @@ class Parameter(models.Model):
         if not isinstance(new_value, list):
             raise TypeError(f"Expected list, got {type(new_value).__name__}")
         typed_list = cast(_list[Any], new_value)
-        self.value = ", ".join(str(item) for item in typed_list)
+        self._set_raw_value(", ".join(str(item) for item in typed_list))
         self.save()
 
     def set_dict(self, new_value: Any) -> None:
         """Set parameter value from dict"""
         if not isinstance(new_value, dict):
             raise TypeError(f"Expected dict, got {type(new_value).__name__}")
-        self.value = json.dumps(new_value)
+        self._set_raw_value(json.dumps(new_value))
         self.save()
 
     def set_path(self, new_value: Any) -> None:
         """Set parameter value from Path object"""
         if not isinstance(new_value, Path):
             raise TypeError(f"Expected Path, got {type(new_value).__name__}")
-        self.value = _str(new_value)
+        self._set_raw_value(_str(new_value))
         self.save()
 
     def set_duration(self, new_value: Any) -> None:
         """Set parameter value from timedelta object"""
         if not isinstance(new_value, timedelta):
             raise TypeError(f"Expected timedelta, got {type(new_value).__name__}")
-        self.value = _str(new_value.total_seconds())
+        self._set_raw_value(_str(new_value.total_seconds()))
         self.save()
 
     def set_percentage(self, new_value: Any) -> None:
@@ -509,8 +505,112 @@ class Parameter(models.Model):
             raise TypeError(f"Expected float or int, got {type(new_value).__name__}")
         if not 0 <= new_value <= 100:
             raise ValueError(f"Percentage must be between 0 and 100, got {new_value}")
-        self.value = _str(new_value)
+        self._set_raw_value(_str(new_value))
         self.save()
+
+    def to_dict(self) -> ParameterDict:
+        """Export this parameter instance to JSON-compatible dictionary.
+
+        Returns:
+            Dictionary with all parameter fields and validators.
+            Note: The value is exported in decrypted form for portability.
+        """
+        param_data: ParameterDict = {
+            "name": self.name,
+            "slug": self.slug,
+            "value": self._get_raw_value(),  # Export decrypted value
+            "value_type": self.value_type,
+            "description": self.description,
+            "is_global": self.is_global,
+        }
+
+        # Add validators if any
+        validators_qs = self.validators.all()  # type: ignore[attr-defined]
+        if validators_qs.exists():  # type: ignore[attr-defined]
+            validators: list[ValidatorDict] = []
+            for validator in validators_qs:  # type: ignore[attr-defined]
+                validators.append(
+                    {
+                        "validator_type": validator.validator_type,  # type: ignore[attr-defined]
+                        "validator_params": validator.validator_params,  # type: ignore[attr-defined]
+                    }
+                )
+            param_data["validators"] = validators
+
+        return param_data
+
+    def from_dict(self, data: ParameterDict) -> None:
+        """Update this parameter instance from a dictionary.
+
+        Args:
+            data: Dictionary containing parameter fields and optionally validators.
+                  The 'slug' and 'value_type' fields are ignored if the instance
+                  already exists (has a pk), as they should not be changed.
+                  Validators are always processed: if not present in data, existing
+                  validators are removed.
+        """
+        # Update basic fields
+        self.name = data.get("name", self.name)
+        self.value = data.get("value", self.value)
+        self.description = data.get("description", self.description)
+        self.is_global = data.get("is_global", self.is_global)
+
+        # Only update slug and value_type if instance is new (no pk)
+        if not self.pk:
+            if "slug" in data:
+                self.slug = data["slug"]
+            if "value_type" in data:
+                self.value_type = data["value_type"]
+
+        # Save the instance
+        self.save()
+
+        # Always handle validators to ensure consistency
+        # If not present in data, None will clear all validators
+        validators_data = data.get("validators", None)
+        self._update_validators(validators_data)
+
+    def _update_validators(self, validators_data: list[ValidatorDict] | None) -> None:
+        """Update validators for this parameter instance.
+
+        The validators in the data represent the desired final state.
+        All existing validators are removed and replaced with the ones from data.
+        If validators_data is None or empty, all validators are removed.
+
+        Args:
+            validators_data: List of validator definitions, or None
+        """
+        # Always clear existing validators first to ensure consistency
+        logger.info("Clearing existing validators for parameter %s", self.slug)
+        existing_validators = self.validators.all()  # type: ignore[attr-defined]
+        existing_validators.delete()  # type: ignore[misc]
+
+        # If no validators provided, we're done (validators are already cleared)
+        if not validators_data:
+            return
+
+        # Create new validators from data
+        for validator_data in validators_data:
+            validator_type = validator_data.get("validator_type")
+            validator_params = validator_data.get("validator_params", {})
+
+            if not validator_type:
+                logger.warning(
+                    "Skipping validator without validator_type for parameter %s",
+                    self.slug,
+                )
+                continue
+
+            # Create validator
+            logger.info(
+                "Creating validator %s for parameter %s",
+                validator_type,
+                self.slug,
+            )
+            self.validators.create(  # type: ignore[attr-defined]
+                validator_type=validator_type,
+                validator_params=validator_params,
+            )
 
     def __str__(self) -> _str:
         return self.name
@@ -559,9 +659,6 @@ class ParameterValidator(models.Model):
         Raises:
             ValueError: If validator_type is not found in built-in or custom validators
         """
-        # Import here to avoid circular imports (utils.py uses Django validators)
-        from django_app_parameter.utils import get_validator_from_registry
-
         # Get validator class/function from registry (built-in or custom)
         validator_class = get_validator_from_registry(self.validator_type)
 
@@ -583,9 +680,6 @@ class ParameterValidator(models.Model):
         return cast(Callable[[Any], None], validator_class(**params))
 
     def __str__(self) -> _str:
-        # Import here to avoid circular imports (utils.py uses Django validators)
-        from django_app_parameter.utils import get_available_validators
-
         available = get_available_validators()
         display_name = available.get(self.validator_type, self.validator_type)
         return f"{self.parameter.name} - {display_name}"
