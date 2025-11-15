@@ -40,9 +40,7 @@ class TestRotateKeyCommandStep1:
         assert "No encryption key configured" in output
         assert not backup_file.exists()
 
-    def test_step1_generates_key_and_backup(
-        self, db, configure_encryption, tmp_path
-    ):
+    def test_step1_generates_key_and_backup(self, db, configure_encryption, tmp_path):
         """Test step 1: generate new key and backup old one."""
         # Create encrypted parameter
         param = Parameter.objects.create(
@@ -80,9 +78,7 @@ class TestRotateKeyCommandStep1:
         assert backup_data["keys"][0]["parameters_count"] == 1
         assert "timestamp" in backup_data["keys"][0]
 
-    def test_step1_appends_to_existing_backup(
-        self, db, configure_encryption, tmp_path
-    ):
+    def test_step1_appends_to_existing_backup(self, db, configure_encryption, tmp_path):
         """Test that step 1 appends to existing backup file."""
         backup_file = tmp_path / "backup.json"
 
@@ -189,9 +185,7 @@ class TestRotateKeyCommandStep2:
         assert param1.str() == "value1"
         assert param2.int() == 42
 
-    def test_step2_with_invalid_old_key(
-        self, db, configure_encryption, tmp_path
-    ):
+    def test_step2_with_invalid_old_key(self, db, configure_encryption, tmp_path):
         """Test step 2 with invalid old key."""
         # Create encrypted parameter
         param = Parameter.objects.create(
@@ -215,9 +209,7 @@ class TestRotateKeyCommandStep2:
 
         assert "Invalid old key provided" in output
 
-    def test_step2_with_same_old_and_new_key(
-        self, db, configure_encryption, tmp_path
-    ):
+    def test_step2_with_same_old_and_new_key(self, db, configure_encryption, tmp_path):
         """Test step 2 when old and new keys are identical."""
         old_key = configure_encryption
         backup_file = tmp_path / "backup.json"
@@ -296,9 +288,7 @@ class TestRotateKeyCommandBackupFile:
     ):
         """Test custom backup location from settings."""
         custom_backup = tmp_path / "custom_backup.json"
-        settings.DJANGO_APP_PARAMETER["encryption_key_backup_file"] = str(
-            custom_backup
-        )
+        settings.DJANGO_APP_PARAMETER["encryption_key_backup_file"] = str(custom_backup)
 
         # Run step 1
         out = StringIO()
