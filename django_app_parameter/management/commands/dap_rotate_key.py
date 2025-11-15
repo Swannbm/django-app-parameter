@@ -117,8 +117,7 @@ class Command(BaseCommand):
             if not current_key_str:
                 self.stdout.write(
                     self.style.ERROR(
-                        "No encryption key configured in settings. "
-                        "Nothing to rotate."
+                        "No encryption key configured in settings. Nothing to rotate."
                     )
                 )
                 return
