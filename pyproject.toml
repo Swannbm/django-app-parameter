@@ -8,7 +8,7 @@ license = "CC0 1.0 Universal"
 readme = "README.md"
 homepage = "https://github.com/Swannbm/django-app-parameter"
 repository = "https://github.com/Swannbm/django-app-parameter"
-documentation = "https://github.com/Swannbm/django-app-parameter"
+documentation = "https://django-app-parameter.readthedocs.io/"
 keywords = [
     "Django",
     "Parameter",
