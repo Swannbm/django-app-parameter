@@ -8,24 +8,29 @@
 ![pyright](https://img.shields.io/badge/type%20checker-pyright-2A6DB2)
 ![licence](https://img.shields.io/badge/licence-CC0%201.0%20Universal-purple)
 
-App-Parameter is a very simple Django app to save some application's parameters in the database. Those parameters can be updated by users at run time (no need to new deployment or any restart). It can be used to store the website's title or default e-mail expeditor...
+Django-app-parameter lets you store application settings in the database and update them at runtime through Django admin - no deployment or restart needed. Perfect for things like site titles, email addresses, feature flags, or any configuration that business users should control.
 
-## Prerequisites
+📚 **[Full Documentation](https://django-app-parameter.readthedocs.io/)**
 
-- **Python 3.10+** (3.10, 3.11, 3.12, or 3.13)
-- **Django 4.2+ LTS** (4.2 LTS or 5.2 LTS)
+## Quick Start
 
-## Install
+### Installation
 
-    pip install django-app-parameter
+```bash
+pip install django-app-parameter
+```
 
 For encryption support (optional):
 
-    pip install django-app-parameter[cryptography]
+```bash
+pip install django-app-parameter[cryptography]
+```
 
-## Settings
+**Requirements:** Python 3.10+ • Django 4.2+ LTS
 
-1. Add "django_app_parameter" to your INSTALLED_APPS setting like this:
+### Configuration
+
+1. Add to `INSTALLED_APPS`:
 
 ```python
 INSTALLED_APPS = [
@@ -34,151 +39,129 @@ INSTALLED_APPS = [
 ]
 ```
 
-If you want global parameters to be available in templates, set provided context processor:
+2. Optional - make global parameters available in all templates:
 
 ```python
 TEMPLATES = [
-    ...
-    "OPTIONS": {
-        "context_processors": [
-            ...
-            "django_app_parameter.context_processors.add_global_parameter_context",
-        ],
+    {
+        ...
+        "OPTIONS": {
+            "context_processors": [
+                ...
+                "django_app_parameter.context_processors.add_global_parameter_context",
+            ],
+        },
     },
 ]
 ```
 
-2. Run `python manage.py migrate` to create the django_app_parameter's table.
+3. Run migrations:
 
-3. Start development server and visit http://127.0.0.1:8000/admin/ to create parameters (you'll need the Admin app enabled).
+```bash
+python manage.py migrate
+```
 
-## Usage
+4. Access Django admin to create your first parameters!
 
-### Add new parameters
+## Basic Usage
 
-Use admin interface to add parameters. You can access a parameter in your code use the "slug" field. Slug is built at first save with: `slugify(self.name).upper().replace("-", "_")`.
+### Reading Parameters
 
-Examples:
-
-    self.name     ==> self.slug
-    blog title    ==> BLOG_TITLE
-    sender e-mail ==> SENDER_E_MAIL
-    ##weird@Na_me ==> WERIDNA_ME
-
-See [Django's slugify function](https://docs.djangoproject.com/fr/4.0/ref/utils/#django.utils.text.slugify) for more informations.
-
-### Access parameter in python code
-
-You can read parameter anywhere in your code:
+In Python code:
 
 ```python
-from django.views.generic import TemplateView
 from django_app_parameter import app_parameter
 
-class RandomView(TemplateView):
-    def get_context_data(self, **kwargs):
-        kwargs.update({"blog_title": app_parameter.BLOG_TITLE})
-        return super().get_context_data(**kwargs)
+# Read parameter value
+title = app_parameter.BLOG_TITLE
+email = app_parameter.CONTACT_EMAIL
 ```
 
-In case you try to read a non existent parameter, an ImproperlyConfigured exception is raised.
-
-### Access parameter in templates
-
-You can also access "global" parameters from every templates:
+In templates (for global parameters):
 
 ```html
-<head>
-    <title>{{ BLOG_TITLE }}</title>
-</head>
+<title>{{ BLOG_TITLE }}</title>
 ```
 
-A to make a parameter global, you only need to check is_global in admin.
+### Writing Parameters
 
-### Bulk load parameter with management command
+```python
+# Update parameter value programmatically
+app_parameter.BLOG_TITLE = "My New Title"
+```
 
-A management command is provided to let you easily load new parameters: `load_param`.
+### Parameter Names → Slugs
 
-It will create or update, the key for matching is the SLUG.
+Parameters are accessed via auto-generated slugs:
 
-It accepts 3 parameters: file, json and no-update.
+```
+"Blog Title"     → BLOG_TITLE
+"sender e-mail"  → SENDER_E_MAIL
+"##weird@Na_me"  → WEIRDNA_ME
+```
 
-#### Option --file
+## Features
 
-Add all parameters listed in the provided file.
+### Supported Types
+String • Integer • Float • Boolean • URL • Email • JSON List • JSON Dict • File Path • Duration • Percentage • DateTime • Date • Time
 
-`load_param --file /path/to/json.file`
+### Bulk Import/Export
 
-Example of file content:
+Load parameters from JSON:
+
+```bash
+python manage.py dap_load --file parameters.json
+```
+
+Export all parameters:
+
+```bash
+python manage.py dap_dump --file backup.json
+```
+
+Example JSON format:
 
 ```json
 [
-    {"name": "hello ze world", "value": "yes", "description": "123", "is_global": true},
-    {"slug": "A8B8C", "name": "back on test", "value": "yes", "value_type": "INT" }
+    {"name": "Site Title", "value": "My Site", "is_global": true},
+    {"name": "Max Upload Size", "value": "10485760", "value_type": "INT"}
 ]
 ```
 
-Here all available property you can add to the json:
-* name
-* slug
-* value_type
-* value
-* description
-* is_global
+Use `--no-update` to only create new parameters without overwriting existing ones (useful in deployment scripts).
 
-If slug is not provided it will be built. Default value_type is STR (string) and default is_global is False. Name is always required, others properties are optionnals.
+### Validation
 
-#### Option --json
+Attach validators to parameters (min/max value, length, regex, choices, etc.) - configured through Django admin or custom validators.
 
-Add parameters in one shot.
+### Encryption
 
-`load_param --json "[{'name': 'param1'}, {'name': 'param2'},]"`
+Enable encryption for sensitive parameters (requires `cryptography` extra). Manage encryption keys with the `dap_rotate_key` command.
 
-The provided json needs to match same rules as for --file option above.
+### History Tracking
 
-You can't use --json and --file together.
+Enable `enable_history` to track all value changes with timestamps - viewable in Django admin.
 
-#### Option --no-update
+---
 
-This option is provided to disable 'update' if parameter with same SLUG already exists. It can be used with --json and --file. It's useful to ensure all parameters are created in all environments and can be executed altogether with migrate. It avoid replacing already existing parameters' values which could lead to breaking environments.
+📖 **[Read the full documentation](https://django-app-parameter.readthedocs.io/)** for detailed information on all features.
 
-`load_param --no-update --file required_parameters.json`
+## Contributing
 
-I use it in my starting container script:
-```bash
-#!/bin/bash
+Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for development guidelines.
 
-# Execute migrations
-python manage.py migrate
+**Requirements for contributions:**
+- Format code with Ruff
+- Add type hints (validated with Pyright)
+- Maintain 100% test coverage
 
-# load new parameters if any
-python manage.py load_param --no-update --file required_parameters.json
+## Links
 
-# launch webserver
-gunicorn config.wsgi
-```
+- 📚 [Documentation](https://django-app-parameter.readthedocs.io/)
+- 🐛 [Issue Tracker](https://github.com/Swannbm/django-app-parameter/issues)
+- 📦 [PyPI Package](https://pypi.org/project/django-app-parameter/)
+- 🔄 [Release Process](.github/RELEASE.md)
 
-Enjoy.
+## License
 
-## Ideas which could come later (or not)
-
-* [] modifications history
-
-If you have new idea you would like to see, feel free to open a new issue in this repo.
-
-## Help developing
-
-If you want to participate to the development, there are a few constraints:
-* Format all your code with Ruff
-* Add type hints and verify with Pyright
-* All unit tests must pass and new code must be covered (100% coverage required)
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed development guidelines.
-
-## Release Process
-
-New versions are automatically published to PyPI via GitHub Actions when a version tag is pushed. See [.github/RELEASE.md](.github/RELEASE.md) for detailed release instructions.
-
-## Why Django-App-Parameter
-
-Because I wanted to try packaging a Django app and I used this one in most of my projects so it seemed a good idea.
+CC0 1.0 Universal - Public Domain
