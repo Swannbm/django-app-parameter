@@ -19,6 +19,10 @@ App-Parameter is a very simple Django app to save some application's parameters 
 
     pip install django-app-parameter
 
+For encryption support (optional):
+
+    pip install django-app-parameter[cryptography]
+
 ## Settings
 
 1. Add "django_app_parameter" to your INSTALLED_APPS setting like this:

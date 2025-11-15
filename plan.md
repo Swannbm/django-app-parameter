@@ -51,14 +51,20 @@
 - [x] Write comprehensive tests (12 encryption tests + 10 rotation tests)
 - [x] Document encryption feature (merged into docs/management-commands.md)
 
-#### 6.3 TODO: Make cryptography dependency optional
-- [ ] Update `pyproject.toml` to make `cryptography` an optional dependency
+#### 6.3 Make cryptography dependency optional ✅
+- [x] Update `pyproject.toml` to make `cryptography` an optional dependency
   - Add `[tool.poetry.extras]` section with `cryptography = ["cryptography"]`
   - Users can install with: `pip install django-app-parameter[cryptography]`
   - Or with poetry: `poetry add django-app-parameter[cryptography]`
-- [ ] Update installation documentation to mention optional cryptography dependency
-- [ ] Add runtime check in encryption functions to provide clear error if cryptography not installed
-- [ ] Explore how to update Tox config to test both with and without cryptography installed
+- [x] Update installation documentation to mention optional cryptography dependency
+  - Updated README.md Install section
+  - Updated docs/README.md Quick Start and Encryption sections
+- [x] Add runtime check in encryption functions to provide clear error if cryptography not installed
+  - Added try/except import with HAS_CRYPTOGRAPHY flag in utils.py
+  - Added runtime check in get_encryption_key() function
+  - Added runtime check in dap_rotate_key command
+- [x] Update Tox config to include cryptography in test environments
+  - Added cryptography>=46.0.0 to all test environments (testenv, pyright, coverage, dev)
 
 
 ---

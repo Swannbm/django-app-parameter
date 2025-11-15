@@ -6,6 +6,9 @@ Store configurable application parameters in database. Modify them via Django ad
 
 ```bash
 pip install django-app-parameter
+
+# Or with encryption support (optional)
+pip install django-app-parameter[cryptography]
 ```
 
 ```python
@@ -139,7 +142,13 @@ Store sensitive parameter values encrypted in database.
 
 ### Setup
 
-**Install**: `pip install cryptography`
+**Install with encryption support**:
+
+```bash
+pip install django-app-parameter[cryptography]
+```
+
+**Configure encryption key**:
 
 ```python
 # settings.py

@@ -5,7 +5,6 @@ from __future__ import annotations
 from importlib import import_module
 from typing import Any
 
-from cryptography.fernet import Fernet
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.core.validators import (
@@ -21,6 +20,13 @@ from django.core.validators import (
     validate_ipv6_address,
     validate_slug,
 )
+
+try:
+    from cryptography.fernet import Fernet
+except ImportError:
+    Fernet = None  # type: ignore[assignment, misc]
+
+HAS_CRYPTOGRAPHY = Fernet is not None
 
 # Cache for imported validators to avoid repeated imports
 _VALIDATOR_CACHE: dict[str, Any] = {}
@@ -233,9 +239,16 @@ def get_encryption_key(key: str | bytes | None = None) -> bytes:
         The encryption key as bytes
 
     Raises:
-        ImproperlyConfigured: If the encryption key is not configured and
-                              no key parameter is provided
+        ImproperlyConfigured: If cryptography is not installed, or if the
+                              encryption key is not configured and no key
+                              parameter is provided
     """
+    if not HAS_CRYPTOGRAPHY:
+        raise ImproperlyConfigured(
+            "Encryption requires the 'cryptography' package. "
+            "Install it with: pip install django-app-parameter[cryptography]"
+        )
+
     # Use provided key if given
     if key is not None:
         if isinstance(key, str):
@@ -271,10 +284,11 @@ def encrypt_value(value: str, encryption_key: str | bytes | None = None) -> str:
         The encrypted value as a string (base64-encoded)
 
     Raises:
-        ImproperlyConfigured: If encryption key is not configured
+        ImproperlyConfigured: If cryptography is not installed or if
+                              encryption key is not configured
     """
     key = get_encryption_key(encryption_key)
-    fernet = Fernet(key)
+    fernet = Fernet(key)  # type: ignore[misc]
     encrypted_bytes = fernet.encrypt(value.encode("utf-8"))
     return encrypted_bytes.decode("utf-8")
 
@@ -294,11 +308,12 @@ def decrypt_value(
         The decrypted plaintext string
 
     Raises:
-        ImproperlyConfigured: If encryption key is not configured
+        ImproperlyConfigured: If cryptography is not installed or if
+                              encryption key is not configured
         cryptography.fernet.InvalidToken: If decryption fails
             (wrong key or corrupted data)
     """
     key = get_encryption_key(encryption_key)
-    fernet = Fernet(key)
+    fernet = Fernet(key)  # type: ignore[misc]
     decrypted_bytes = fernet.decrypt(encrypted_value.encode("utf-8"))
     return decrypted_bytes.decode("utf-8")

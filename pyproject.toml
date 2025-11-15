@@ -21,6 +21,11 @@ keywords = [
 [tool.poetry.dependencies]
 python = "^3.10"
 Django = ">=4.2,<6.0"
+
+[tool.poetry.extras]
+cryptography = ["cryptography"]
+
+[tool.poetry.group.cryptography.dependencies]
 cryptography = "^46.0.3"
 
 [tool.poetry.group.dev.dependencies]

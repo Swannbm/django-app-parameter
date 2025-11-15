@@ -24,11 +24,19 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, TypedDict
 
-from cryptography.fernet import Fernet, InvalidToken
+from django.core.exceptions import ImproperlyConfigured
 from django.core.management.base import BaseCommand, CommandParser
 
 from django_app_parameter.models import Parameter
 from django_app_parameter.utils import decrypt_value, encrypt_value, get_setting
+
+try:
+    from cryptography.fernet import Fernet, InvalidToken
+except ImportError:
+    Fernet = None  # type: ignore[assignment, misc]
+    InvalidToken = None  # type: ignore[assignment, misc]
+
+HAS_CRYPTOGRAPHY = Fernet is not None
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +71,13 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args: Any, **options: Any) -> None:
+        # Check if cryptography is available
+        if not HAS_CRYPTOGRAPHY:
+            raise ImproperlyConfigured(
+                "Encryption requires the 'cryptography' package. "
+                "Install it with: pip install django-app-parameter[cryptography]"
+            )
+
         # Determine backup file location
         backup_file_path = self._get_backup_file_path(options.get("backup_file"))
 
@@ -114,7 +129,7 @@ class Command(BaseCommand):
         self.stdout.write(f"Found {encrypted_count} encrypted parameters\n")
 
         # Generate new key
-        new_key = Fernet.generate_key()
+        new_key = Fernet.generate_key()  # type: ignore[misc]
         new_key_str = new_key.decode("utf-8")
 
         # Backup old key with timestamp
@@ -174,7 +189,7 @@ class Command(BaseCommand):
         # Validate old key
         try:
             old_key = old_key_str.encode("utf-8")
-            Fernet(old_key)  # Validate Fernet key format
+            Fernet(old_key)  # type: ignore[misc]  # Validate Fernet key format
         except Exception as e:
             self.stdout.write(
                 self.style.ERROR(f"Invalid old key provided: {e}")
@@ -193,7 +208,7 @@ class Command(BaseCommand):
                 )
                 return
             new_key = new_key_str.encode("utf-8")
-            Fernet(new_key)  # Validate
+            Fernet(new_key)  # type: ignore[misc]  # Validate
         except Exception as e:
             self.stdout.write(
                 self.style.ERROR(f"Invalid encryption key in settings: {e}")
@@ -238,7 +253,7 @@ class Command(BaseCommand):
                 success_count += 1
                 logger.debug("Re-encrypted parameter: %s", param.slug)
 
-            except InvalidToken:
+            except InvalidToken:  # type: ignore[misc]
                 failed_params.append(
                     f"{param.slug} (failed to decrypt with old key)"
                 )
