@@ -1,7 +1,8 @@
 """Tests for Parameter history tracking functionality"""
 
 import pytest
-from django_app_parameter.models import Parameter, ParameterHistory
+
+from django_app_parameter.models import Parameter
 
 
 @pytest.mark.django_db

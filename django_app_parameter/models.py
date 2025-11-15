@@ -528,9 +528,7 @@ class Parameter(models.Model):
             validator(url_value)
         except ValidationError as e:
             raise ValueError(f"Invalid URL: {url_value}") from e
-        encrypted_value = (
-            encrypt_value(url_value) if self.enable_cypher else url_value
-        )
+        encrypted_value = encrypt_value(url_value) if self.enable_cypher else url_value
         self._save_to_history(encrypted_value)
         self._set_raw_value(url_value)
         self.save()
@@ -605,9 +603,7 @@ class Parameter(models.Model):
         if not isinstance(new_value, float | int):
             raise TypeError(f"Expected float or int, got {type(new_value).__name__}")
         if not 0 <= new_value <= 100:
-            raise ValueError(
-                f"Percentage must be between 0 and 100, got {new_value}"
-            )
+            raise ValueError(f"Percentage must be between 0 and 100, got {new_value}")
         new_raw_value = _str(new_value)
         encrypted_value = (
             encrypt_value(new_raw_value) if self.enable_cypher else new_raw_value

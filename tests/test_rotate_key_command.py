@@ -308,7 +308,10 @@ class TestRotateKeyCommandWithoutCryptography:
         backup_file = tmp_path / "backup.json"
 
         # Mock HAS_CRYPTOGRAPHY to False
-        with patch("django_app_parameter.management.commands.dap_rotate_key.HAS_CRYPTOGRAPHY", False):
+        with patch(
+            "django_app_parameter.management.commands.dap_rotate_key.HAS_CRYPTOGRAPHY",
+            False,
+        ):
             with pytest.raises(ImproperlyConfigured) as exc_info:
                 call_command("dap_rotate_key", backup_file=str(backup_file))
             assert "cryptography" in str(exc_info.value).lower()
@@ -322,7 +325,10 @@ class TestRotateKeyCommandExceptionHandling:
         backup_file = tmp_path / "backup.json"
 
         # Mock get_setting to raise exception
-        with patch("django_app_parameter.management.commands.dap_rotate_key.get_setting") as mock_get:
+        with patch(
+            "django_app_parameter.management.commands"
+            ".dap_rotate_key.get_setting"
+            ) as mock_get:
             mock_get.side_effect = Exception("Settings error")
 
             out = StringIO()
@@ -393,7 +399,10 @@ class TestRotateKeyCommandExceptionHandling:
         backup_file = tmp_path / "backup.json"
 
         # Mock encrypt_value to raise exception
-        with patch("django_app_parameter.management.commands.dap_rotate_key.encrypt_value") as mock_encrypt:
+        with patch(
+            "django_app_parameter.management.commands."
+            "dap_rotate_key.encrypt_value"
+            ) as mock_encrypt:
             mock_encrypt.side_effect = Exception("Encryption error")
 
             out = StringIO()
