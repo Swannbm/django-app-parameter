@@ -4,6 +4,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [2.1.2] - 2025.11.15
+
+### Changed
+* Modernized README with concise quick start guide and feature overview
+* Improved documentation structure with links to full documentation
+
 ## [2.1.1] - 2025.11.15
 
 ### Fixed

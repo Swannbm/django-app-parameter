@@ -3,7 +3,7 @@
 ![Python](https://img.shields.io/badge/python-3.10%20|%203.11%20|%203.12%20|%203.13-yellow)
 ![Django](https://img.shields.io/badge/django-4.2%20LTS%20|%205.2%20LTS-green)
 ![coverage](https://img.shields.io/badge/coverage-100%25-green)
-![version](https://img.shields.io/badge/version-2.1.1-blue)
+![version](https://img.shields.io/badge/version-2.1.2-blue)
 ![ruff](https://img.shields.io/badge/code%20style-ruff-000000)
 ![pyright](https://img.shields.io/badge/type%20checker-pyright-2A6DB2)
 ![licence](https://img.shields.io/badge/licence-CC0%201.0%20Universal-purple)
