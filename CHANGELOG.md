@@ -4,6 +4,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [2.1.1] - 2025.11.15
+
+### Fixed
+* Read the Docs build configuration: created `docs/requirements.txt` with Sphinx dependencies and simplified `.readthedocs.yaml` to properly support Poetry-based projects
+
 ## [2.1.0] - 2025.11.15
 
 ### Added

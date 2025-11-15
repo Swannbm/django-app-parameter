@@ -1,0 +1,11 @@
+# Documentation build dependencies for Read the Docs
+# These are the Sphinx-related dependencies from pyproject.toml [tool.poetry.group.dev.dependencies]
+
+# Core Sphinx
+sphinx>=8.1.3
+sphinx-rtd-theme>=3.0.2
+sphinx-autodoc-typehints>=2.5.0
+myst-parser>=4.0.0
+
+# Django is required for the project itself
+Django>=4.2,<6.0
