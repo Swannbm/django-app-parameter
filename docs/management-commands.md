@@ -4,6 +4,8 @@
 
 Import parameters from JSON file or string.
 
+> **Backward Compatibility**: The `dap_load` command is **backward compatible** and can load dumps from any previous version (v1.x, v2.0, v2.1+). Missing fields automatically use default values. See [dump-format-versions.md](dump-format-versions.md) for details.
+
 ### Syntax
 
 ```bash
@@ -33,6 +35,7 @@ python manage.py dap_load --json '[{"name": "Site Title", "value": "My Site"}]'
 
 ### JSON Format
 
+**Complete example (v2.1+):**
 ```json
 [
     {
@@ -42,6 +45,8 @@ python manage.py dap_load --json '[{"name": "Site Title", "value": "My Site"}]'
         "description": "Main site title",
         "is_global": true,
         "slug": "SITE_TITLE",
+        "enable_cypher": false,
+        "enable_history": true,
         "validators": [
             {
                 "validator_type": "MaxLengthValidator",
@@ -52,17 +57,29 @@ python manage.py dap_load --json '[{"name": "Site Title", "value": "My Site"}]'
 ]
 ```
 
+**Minimal example (all versions):**
+```json
+[
+    {
+        "name": "Site Title",
+        "value": "My Blog"
+    }
+]
+```
+
 ### Fields
 
-| Field | Required | Default | Description |
-|-------|----------|---------|-------------|
-| `name` | Yes | - | Human-readable name |
-| `value` | No | `""` | Parameter value |
-| `value_type` | No | `"STR"` | Type code (see below) |
-| `description` | No | `""` | Description |
-| `is_global` | No | `false` | Template access |
-| `slug` | No | auto | Custom slug (auto-generated from `name`) |
-| `validators` | No | `[]` | Validator list |
+| Field | Required | Default | Since | Description |
+|-------|----------|---------|-------|-------------|
+| `name` | Yes | - | v1.0 | Human-readable name |
+| `value` | No | `""` | v1.0 | Parameter value |
+| `value_type` | No | `"STR"` | v1.0 | Type code (see below) |
+| `description` | No | `""` | v1.0 | Description |
+| `is_global` | No | `false` | v1.0 | Template access |
+| `slug` | No | auto | v1.0 | Custom slug (auto-generated from `name`) |
+| `validators` | No | `[]` | v2.0 | Validator list |
+| `enable_cypher` | No | `false` | v2.0 | Enable encryption for this parameter |
+| `enable_history` | No | `false` | v2.1 | Track value changes in history |
 
 ### Type Codes
 
@@ -294,7 +311,7 @@ python manage.py dap_dump backup.json --indent 2
 
 ### Output Format
 
-Includes all fields and validators:
+Includes all parameter fields and validators (v2.1+ format):
 
 ```json
 [
@@ -305,6 +322,8 @@ Includes all fields and validators:
         "value_type": "STR",
         "description": "Main title",
         "is_global": true,
+        "enable_cypher": false,
+        "enable_history": true,
         "validators": [
             {
                 "validator_type": "MaxLengthValidator",
@@ -319,6 +338,8 @@ Includes all fields and validators:
         "value_type": "DCL",
         "description": "VAT rate",
         "is_global": false,
+        "enable_cypher": false,
+        "enable_history": false,
         "validators": [
             {
                 "validator_type": "MinValueValidator",
@@ -332,6 +353,8 @@ Includes all fields and validators:
     }
 ]
 ```
+
+> **Note**: History entries themselves are NOT exported. Only the `enable_history` flag is included. This means you can enable history tracking on import, but previous historical values are not migrated.
 
 ### Use Cases
 

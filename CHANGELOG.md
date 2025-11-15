@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 * Encryption support for parameters with `enable_cypher` field
 * `dap_rotate_key` management command for rotating encryption keys (two-step process for safety)
 * Persistent backup file for encryption keys (`dap_backup_key.json`)
+* Parameter value history tracking: new `enable_history` field to track previous values with timestamps via `ParameterHistory` model (viewable in admin as read-only inline)
 
 ### Changed
 * Management commands renamed with `dap_` prefix to avoid conflicts: `load_param` → `dap_load`, `dump_param` → `dap_dump`

@@ -10,7 +10,7 @@ class TestEncryptionWithoutCryptography:
     """Test encryption utilities when cryptography package is not available."""
 
     def test_get_encryption_key_without_cryptography(self):
-        """Test that get_encryption_key raises ImproperlyConfigured without cryptography."""
+        """Test get_encryption_key raises ImproperlyConfigured without lib."""
         # Mock HAS_CRYPTOGRAPHY to False
         with patch("django_app_parameter.utils.HAS_CRYPTOGRAPHY", False):
             from django_app_parameter.utils import get_encryption_key
