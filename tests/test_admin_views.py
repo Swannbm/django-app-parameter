@@ -97,6 +97,10 @@ class TestParameterAdminCRUD:
             "validators-INITIAL_FORMS": "0",
             "validators-MIN_NUM_FORMS": "0",
             "validators-MAX_NUM_FORMS": "1000",
+            "history-TOTAL_FORMS": "0",
+            "history-INITIAL_FORMS": "0",
+            "history-MIN_NUM_FORMS": "0",
+            "history-MAX_NUM_FORMS": "1000",
         }
         response = admin_client.post(url, data, follow=True)
 
@@ -179,6 +183,10 @@ class TestParameterAdminValidators:
             "validators-0-validator_type": "MinValueValidator",
             "validators-0-validator_params": json.dumps({"limit_value": 50}),
             "validators-0-parameter": str(param.pk),
+            "history-TOTAL_FORMS": "0",
+            "history-INITIAL_FORMS": "0",
+            "history-MIN_NUM_FORMS": "0",
+            "history-MAX_NUM_FORMS": "1000",
         }
         response = admin_client.post(url, data, follow=True)
 
