@@ -71,6 +71,25 @@ class TestEncryptionUtilities:
         with pytest.raises(InvalidToken):
             decrypt_value(encrypted)
 
+    def test_get_encryption_key_with_bytes_key(self):
+        """Test get_encryption_key with bytes key parameter."""
+        custom_key_bytes = Fernet.generate_key()
+        key = get_encryption_key(custom_key_bytes)
+        assert key == custom_key_bytes
+        assert isinstance(key, bytes)
+
+    def test_get_encryption_key_from_settings_as_bytes(
+        self, settings, encryption_key
+    ):
+        """Test get_encryption_key when settings key is already bytes."""
+        if not hasattr(settings, "DJANGO_APP_PARAMETER"):
+            settings.DJANGO_APP_PARAMETER = {}
+        # Set key as bytes in settings
+        settings.DJANGO_APP_PARAMETER["encryption_key"] = encryption_key.encode("utf-8")
+        key = get_encryption_key()
+        assert key == encryption_key.encode("utf-8")
+        assert isinstance(key, bytes)
+
 
 class TestParameterEncryption:
     """Tests for parameter encryption functionality."""

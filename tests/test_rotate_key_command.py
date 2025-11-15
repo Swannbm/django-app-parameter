@@ -3,9 +3,11 @@
 import json
 from io import StringIO
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 from cryptography.fernet import Fernet
+from django.core.exceptions import ImproperlyConfigured
 from django.core.management import call_command
 
 from django_app_parameter.models import Parameter
@@ -296,3 +298,112 @@ class TestRotateKeyCommandBackupFile:
 
         # Check custom backup file was created
         assert custom_backup.exists()
+
+
+class TestRotateKeyCommandWithoutCryptography:
+    """Tests for behavior when cryptography package is not available."""
+
+    def test_command_without_cryptography(self, db, tmp_path):
+        """Test that command raises ImproperlyConfigured without cryptography."""
+        backup_file = tmp_path / "backup.json"
+
+        # Mock HAS_CRYPTOGRAPHY to False
+        with patch("django_app_parameter.management.commands.dap_rotate_key.HAS_CRYPTOGRAPHY", False):
+            with pytest.raises(ImproperlyConfigured) as exc_info:
+                call_command("dap_rotate_key", backup_file=str(backup_file))
+            assert "cryptography" in str(exc_info.value).lower()
+
+
+class TestRotateKeyCommandExceptionHandling:
+    """Tests for exception handling in dap_rotate_key."""
+
+    def test_step1_with_settings_exception(self, db, tmp_path, settings):
+        """Test step 1 when getting encryption key raises exception."""
+        backup_file = tmp_path / "backup.json"
+
+        # Mock get_setting to raise exception
+        with patch("django_app_parameter.management.commands.dap_rotate_key.get_setting") as mock_get:
+            mock_get.side_effect = Exception("Settings error")
+
+            out = StringIO()
+            call_command("dap_rotate_key", backup_file=str(backup_file), stdout=out)
+            output = out.getvalue()
+
+            assert "Failed to get current encryption key" in output
+
+    def test_step2_with_no_new_key_in_settings(self, db, tmp_path, settings):
+        """Test step 2 when no new encryption key is configured."""
+        old_key = Fernet.generate_key().decode("utf-8")
+        backup_file = tmp_path / "backup.json"
+
+        # Remove encryption key from settings
+        if hasattr(settings, "DJANGO_APP_PARAMETER"):
+            settings.DJANGO_APP_PARAMETER.pop("encryption_key", None)
+
+        out = StringIO()
+        call_command(
+            "dap_rotate_key",
+            old_key=old_key,
+            backup_file=str(backup_file),
+            stdout=out,
+        )
+        output = out.getvalue()
+
+        assert "No encryption key configured in settings" in output
+
+    def test_step2_with_invalid_new_key_in_settings(
+        self, db, tmp_path, settings, configure_encryption
+    ):
+        """Test step 2 when new encryption key in settings is invalid."""
+        old_key = Fernet.generate_key().decode("utf-8")
+        backup_file = tmp_path / "backup.json"
+
+        # Set invalid key in settings
+        settings.DJANGO_APP_PARAMETER["encryption_key"] = "invalid_key"
+
+        out = StringIO()
+        call_command(
+            "dap_rotate_key",
+            old_key=old_key,
+            backup_file=str(backup_file),
+            stdout=out,
+        )
+        output = out.getvalue()
+
+        assert "Invalid encryption key in settings" in output
+
+    def test_step2_with_general_re_encryption_exception(
+        self, db, configure_encryption, tmp_path, settings
+    ):
+        """Test step 2 when re-encryption raises a general exception."""
+        # Create encrypted parameter
+        old_key = configure_encryption
+        param = Parameter.objects.create(
+            name="Secret",
+            value_type=Parameter.TYPES.STR,
+            value="test",
+            enable_cypher=True,
+        )
+        param.set_str("value")
+
+        # Generate new key
+        new_key = Fernet.generate_key().decode("utf-8")
+        settings.DJANGO_APP_PARAMETER["encryption_key"] = new_key
+
+        backup_file = tmp_path / "backup.json"
+
+        # Mock encrypt_value to raise exception
+        with patch("django_app_parameter.management.commands.dap_rotate_key.encrypt_value") as mock_encrypt:
+            mock_encrypt.side_effect = Exception("Encryption error")
+
+            out = StringIO()
+            call_command(
+                "dap_rotate_key",
+                old_key=old_key,
+                backup_file=str(backup_file),
+                stdout=out,
+            )
+            output = out.getvalue()
+
+            assert "Failed to re-encrypt 1 parameters" in output
+            assert "Encryption error" in output
