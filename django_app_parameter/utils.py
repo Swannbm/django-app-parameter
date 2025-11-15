@@ -218,21 +218,33 @@ def clear_validator_cache() -> None:
 # ===== Encryption utilities =====
 
 
-def get_encryption_key() -> bytes:
+def get_encryption_key(key: str | bytes | None = None) -> bytes:
     """
-    Get the encryption key from Django settings.
+    Get the encryption key from Django settings or use provided key.
 
     The key should be stored in settings.DJANGO_APP_PARAMETER['encryption_key']
     and must be a Fernet-compatible key (32 url-safe base64-encoded bytes).
+
+    Args:
+        key: Optional encryption key to use. If provided, this key is used
+             instead of the one from settings. Can be str or bytes.
 
     Returns:
         The encryption key as bytes
 
     Raises:
-        ImproperlyConfigured: If the encryption key is not configured
+        ImproperlyConfigured: If the encryption key is not configured and
+                              no key parameter is provided
     """
-    key = get_setting("encryption_key")
-    if not key:
+    # Use provided key if given
+    if key is not None:
+        if isinstance(key, str):
+            return key.encode("utf-8")
+        return key
+
+    # Otherwise get from settings
+    settings_key = get_setting("encryption_key")
+    if not settings_key:
         raise ImproperlyConfigured(
             "No encryption key configured. "
             "Set DJANGO_APP_PARAMETER['encryption_key'] in settings. "
@@ -241,17 +253,19 @@ def get_encryption_key() -> bytes:
         )
 
     # Convert to bytes if string
-    if isinstance(key, str):
-        return key.encode("utf-8")
-    return key
+    if isinstance(settings_key, str):
+        return settings_key.encode("utf-8")
+    return settings_key
 
 
-def encrypt_value(value: str) -> str:
+def encrypt_value(value: str, encryption_key: str | bytes | None = None) -> str:
     """
     Encrypt a string value using Fernet symmetric encryption.
 
     Args:
         value: The plaintext string to encrypt
+        encryption_key: Optional encryption key to use. If not provided,
+                       uses key from settings.
 
     Returns:
         The encrypted value as a string (base64-encoded)
@@ -259,18 +273,22 @@ def encrypt_value(value: str) -> str:
     Raises:
         ImproperlyConfigured: If encryption key is not configured
     """
-    key = get_encryption_key()
+    key = get_encryption_key(encryption_key)
     fernet = Fernet(key)
     encrypted_bytes = fernet.encrypt(value.encode("utf-8"))
     return encrypted_bytes.decode("utf-8")
 
 
-def decrypt_value(encrypted_value: str) -> str:
+def decrypt_value(
+    encrypted_value: str, encryption_key: str | bytes | None = None
+) -> str:
     """
     Decrypt a string value using Fernet symmetric encryption.
 
     Args:
         encrypted_value: The encrypted value as a string (base64-encoded)
+        encryption_key: Optional encryption key to use. If not provided,
+                       uses key from settings.
 
     Returns:
         The decrypted plaintext string
@@ -280,7 +298,7 @@ def decrypt_value(encrypted_value: str) -> str:
         cryptography.fernet.InvalidToken: If decryption fails
             (wrong key or corrupted data)
     """
-    key = get_encryption_key()
+    key = get_encryption_key(encryption_key)
     fernet = Fernet(key)
     decrypted_bytes = fernet.decrypt(encrypted_value.encode("utf-8"))
     return decrypted_bytes.decode("utf-8")

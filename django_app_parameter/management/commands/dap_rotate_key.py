@@ -22,16 +22,29 @@ import json
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, TypedDict
 
 from cryptography.fernet import Fernet, InvalidToken
-from django.conf import settings
 from django.core.management.base import BaseCommand, CommandParser
 
 from django_app_parameter.models import Parameter
-from django_app_parameter.utils import get_setting
+from django_app_parameter.utils import decrypt_value, encrypt_value, get_setting
 
 logger = logging.getLogger(__name__)
+
+
+class KeyBackupEntry(TypedDict):
+    """Structure for a single key backup entry."""
+
+    timestamp: str
+    key: str
+    parameters_count: int
+
+
+class BackupData(TypedDict):
+    """Structure for the backup file."""
+
+    keys: list[KeyBackupEntry]
 
 
 class Command(BaseCommand):
@@ -108,6 +121,7 @@ class Command(BaseCommand):
         timestamp = datetime.now().isoformat()
 
         # Load existing backup file or create new structure
+        backup_data: BackupData
         if backup_file.exists():
             with backup_file.open("r") as f:
                 backup_data = json.load(f)
@@ -126,14 +140,12 @@ class Command(BaseCommand):
         # Write backup file
         backup_file.parent.mkdir(parents=True, exist_ok=True)
         with backup_file.open("w") as f:
-            json.dump(backup_data, f, indent=2)
+            json.dump(backup_data, f, indent=4)
 
         self.stdout.write(
             self.style.SUCCESS(f"✓ Backed up old key to: {backup_file}")
         )
-        self.stdout.write(
-            self.style.SUCCESS(f"✓ Generated new encryption key\n")
-        )
+        self.stdout.write(self.style.SUCCESS("✓ Generated new encryption key\n"))
 
         # Display new key
         self.stdout.write(self.style.HTTP_INFO("NEW ENCRYPTION KEY:"))
@@ -151,12 +163,6 @@ class Command(BaseCommand):
         self.stdout.write(
             "3. Once settings are updated, run:\n"
             f"   python manage.py dap_rotate_key --old-key {current_key_str}\n"
-        )
-
-        self.stdout.write(
-            self.style.WARNING(
-                f"\nOld key backed up to: {backup_file}"
-            )
         )
 
     def _apply_rotation(self, old_key_str: str, backup_file: Path) -> None:
@@ -216,23 +222,17 @@ class Command(BaseCommand):
 
         self.stdout.write(f"Processing {count} encrypted parameters...\n")
 
-        # Re-encrypt each parameter
-        old_fernet = Fernet(old_key)
-        new_fernet = Fernet(new_key)
-
+        # Re-encrypt each parameter using helpers with explicit keys
         success_count = 0
-        failed_params = []
+        failed_params: list[str] = []
 
         for param in encrypted_params:
             try:
-                # Decrypt with old key
-                encrypted_value = param.value
-                decrypted_bytes = old_fernet.decrypt(encrypted_value.encode("utf-8"))
-                decrypted_value = decrypted_bytes.decode("utf-8")
+                # Decrypt with old key (passing key explicitly)
+                decrypted_value = decrypt_value(param.value, encryption_key=old_key_str)
 
-                # Re-encrypt with new key
-                encrypted_bytes = new_fernet.encrypt(decrypted_value.encode("utf-8"))
-                param.value = encrypted_bytes.decode("utf-8")
+                # Re-encrypt with new key (passing key explicitly)
+                param.value = encrypt_value(decrypted_value, encryption_key=new_key_str)
                 param.save()
 
                 success_count += 1
@@ -257,7 +257,9 @@ class Command(BaseCommand):
 
         if failed_params:
             self.stdout.write(
-                self.style.ERROR(f"\n✗ Failed to re-encrypt {len(failed_params)} parameters:")
+                self.style.ERROR(
+                    f"\n✗ Failed to re-encrypt {len(failed_params)} parameters:"
+                )
             )
             for failed in failed_params:
                 self.stdout.write(f"  - {failed}")

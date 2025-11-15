@@ -6,10 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 * Encryption support for parameters with `enable_cypher` field
-* `dap_rotate_key` management command for rotating encryption keys
+* `dap_rotate_key` management command for rotating encryption keys (two-step process for safety)
+* Persistent backup file for encryption keys (`dap_backup_key.json`)
 
 ### Changed
 * Management commands renamed with `dap_` prefix to avoid conflicts: `load_param` → `dap_load`, `dump_param` → `dap_dump`
+* Key rotation process redesigned: step 1 generates new key and backs up old one, step 2 applies rotation
 
 ## [2.0.0] - 2025.11.14
 
