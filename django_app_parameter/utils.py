@@ -5,7 +5,9 @@ from __future__ import annotations
 from importlib import import_module
 from typing import Any
 
+from cryptography.fernet import Fernet
 from django.conf import settings
+from django.core.exceptions import ImproperlyConfigured
 from django.core.validators import (
     EmailValidator,
     FileExtensionValidator,
@@ -211,3 +213,74 @@ def clear_validator_cache() -> None:
     Useful for testing or when validators are dynamically modified.
     """
     _VALIDATOR_CACHE.clear()
+
+
+# ===== Encryption utilities =====
+
+
+def get_encryption_key() -> bytes:
+    """
+    Get the encryption key from Django settings.
+
+    The key should be stored in settings.DJANGO_APP_PARAMETER['encryption_key']
+    and must be a Fernet-compatible key (32 url-safe base64-encoded bytes).
+
+    Returns:
+        The encryption key as bytes
+
+    Raises:
+        ImproperlyConfigured: If the encryption key is not configured
+    """
+    key = get_setting("encryption_key")
+    if not key:
+        raise ImproperlyConfigured(
+            "No encryption key configured. "
+            "Set DJANGO_APP_PARAMETER['encryption_key'] in settings. "
+            "Generate one with: from cryptography.fernet import Fernet; "
+            "Fernet.generate_key()"
+        )
+
+    # Convert to bytes if string
+    if isinstance(key, str):
+        return key.encode("utf-8")
+    return key
+
+
+def encrypt_value(value: str) -> str:
+    """
+    Encrypt a string value using Fernet symmetric encryption.
+
+    Args:
+        value: The plaintext string to encrypt
+
+    Returns:
+        The encrypted value as a string (base64-encoded)
+
+    Raises:
+        ImproperlyConfigured: If encryption key is not configured
+    """
+    key = get_encryption_key()
+    fernet = Fernet(key)
+    encrypted_bytes = fernet.encrypt(value.encode("utf-8"))
+    return encrypted_bytes.decode("utf-8")
+
+
+def decrypt_value(encrypted_value: str) -> str:
+    """
+    Decrypt a string value using Fernet symmetric encryption.
+
+    Args:
+        encrypted_value: The encrypted value as a string (base64-encoded)
+
+    Returns:
+        The decrypted plaintext string
+
+    Raises:
+        ImproperlyConfigured: If encryption key is not configured
+        cryptography.fernet.InvalidToken: If decryption fails
+            (wrong key or corrupted data)
+    """
+    key = get_encryption_key()
+    fernet = Fernet(key)
+    decrypted_bytes = fernet.decrypt(encrypted_value.encode("utf-8"))
+    return decrypted_bytes.decode("utf-8")

@@ -4,6 +4,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+* Encryption support for parameters with `enable_cypher` field
+* `dap_rotate_key` management command for rotating encryption keys
+
 ### Changed
 * Management commands renamed with `dap_` prefix to avoid conflicts: `load_param` → `dap_load`, `dump_param` → `dap_dump`
 

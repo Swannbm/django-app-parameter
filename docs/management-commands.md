@@ -349,8 +349,46 @@ Export from one environment, import to another.
 **Version Control:**
 Track parameter changes in git (exclude sensitive params).
 
+## dap_rotate_key
+
+Rotate encryption key for encrypted parameters.
+
+### Syntax
+
+```bash
+python manage.py dap_rotate_key [--new-key <key>] [--backup-dir <path>]
+```
+
+### Options
+
+- `--new-key <key>`: New encryption key (base64). Auto-generated if omitted.
+- `--backup-dir <path>`: Backup directory for old key (default: current directory)
+
+### Examples
+
+```bash
+# Auto-generate new key
+python manage.py dap_rotate_key
+
+# Use specific key
+python manage.py dap_rotate_key --new-key <base64-key>
+
+# Custom backup location
+python manage.py dap_rotate_key --backup-dir /backups
+```
+
+### Process
+
+1. Decrypts all encrypted parameters
+2. Backs up current key with timestamp
+3. Re-encrypts with new key
+4. Prompts for confirmation
+
+See [Encryption](encryption.md) for setup and usage.
+
 ## Next
 
+- [Encryption](encryption.md)
 - [Usage Guide](usage-guide.md)
 - [FAQ](faq.md)
 - [Command implementations](../django_app_parameter/management/commands/)

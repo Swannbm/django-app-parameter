@@ -210,6 +210,33 @@ class Parameter(models.Model):
             self.slug = parameter_slugify(self.name)
         super().save(*args, **kwargs)
 
+    def _get_raw_value(self) -> _str:
+        """
+        Get the raw value, decrypting it if enable_cypher is True.
+
+        Returns:
+            The decrypted value if enable_cypher is True, otherwise the raw value
+        """
+        if self.enable_cypher:
+            from django_app_parameter.utils import decrypt_value
+
+            return decrypt_value(self.value)
+        return self.value
+
+    def _set_raw_value(self, value: _str) -> None:
+        """
+        Set the raw value, encrypting it if enable_cypher is True.
+
+        Args:
+            value: The plaintext value to store (will be encrypted if needed)
+        """
+        if self.enable_cypher:
+            from django_app_parameter.utils import encrypt_value
+
+            self.value = encrypt_value(value)
+        else:
+            self.value = value
+
     def get(self) -> Any:
         """Return parameter value casted accordingly to its value_type"""
         functions: dict[str, str] = {
@@ -235,45 +262,46 @@ class Parameter(models.Model):
 
     def int(self) -> int:
         """Return parameter value casted as int()"""
-        return int(self.value)
+        return int(self._get_raw_value())
 
     def str(self) -> _str:
         """Return parameter value casted as str()"""
-        return self.value
+        return self._get_raw_value()
 
     def float(self) -> float:
         """Return parameter value casted as float()"""
-        return float(self.value)
+        return float(self._get_raw_value())
 
     def decimal(self) -> Decimal:
         """Return parameter value casted as Decimal()"""
-        return Decimal(self.value)
+        return Decimal(self._get_raw_value())
 
     def json(self) -> Any:
         """Return parameter value casted as dict() using json lib"""
-        return json.loads(self.value)
+        return json.loads(self._get_raw_value())
 
     def bool(self) -> bool:
         """Return parameter value casted as bool()"""
-        if not self.value or self.value.lower() in ["false", "0"]:
+        raw_value = self._get_raw_value()
+        if not raw_value or raw_value.lower() in ["false", "0"]:
             return False
-        return bool(self.value)
+        return bool(raw_value)
 
     def date(self) -> date_type:
         """Return parameter value casted as date() from ISO format YYYY-MM-DD"""
-        return datetime_type.fromisoformat(self.value.strip()).date()
+        return datetime_type.fromisoformat(self._get_raw_value().strip()).date()
 
     def datetime(self) -> _datetime:
         """Return parameter value casted as datetime() from ISO 8601 format"""
-        return _datetime.fromisoformat(self.value.strip())
+        return _datetime.fromisoformat(self._get_raw_value().strip())
 
     def time(self) -> _time:
         """Return parameter value casted as time() from HH:MM:SS format"""
-        return _datetime.strptime(self.value.strip(), "%H:%M:%S").time()
+        return _datetime.strptime(self._get_raw_value().strip(), "%H:%M:%S").time()
 
     def url(self) -> _str:
         """Return parameter value validated as URL"""
-        url_value = self.value.strip()
+        url_value = self._get_raw_value().strip()
         validator = URLValidator()
         try:
             validator(url_value)
@@ -283,7 +311,7 @@ class Parameter(models.Model):
 
     def email(self) -> _str:
         """Return parameter value validated as email"""
-        email_value = self.value.strip()
+        email_value = self._get_raw_value().strip()
         try:
             validate_email(email_value)
         except ValidationError as e:
@@ -292,30 +320,30 @@ class Parameter(models.Model):
 
     def list(self) -> _list[_str]:
         """Return parameter value as list split by comma"""
-        value_str = self.value.strip()
+        value_str = self._get_raw_value().strip()
         if not value_str:
             return []
         return [item.strip() for item in value_str.split(",")]
 
     def dict(self) -> _dict[_str, Any]:
         """Return parameter value as dict from JSON"""
-        result = json.loads(self.value)
+        result = json.loads(self._get_raw_value())
         if not isinstance(result, _dict):
             raise ValueError(f"Expected dict, got {type(result).__name__}")
         return result  # type: ignore[return-value]
 
     def path(self) -> Path:
         """Return parameter value as Path object"""
-        return Path(self.value.strip())
+        return Path(self._get_raw_value().strip())
 
     def duration(self) -> timedelta:
         """Return parameter value as timedelta from seconds"""
-        seconds = _float(self.value)
+        seconds = _float(self._get_raw_value())
         return timedelta(seconds=seconds)
 
     def percentage(self) -> _float:
         """Return parameter value as percentage (validated 0-100)"""
-        value = _float(self.value)
+        value = _float(self._get_raw_value())
         if not 0 <= value <= 100:
             raise ValueError(f"Percentage must be between 0 and 100, got {value}")
         return value
@@ -360,61 +388,62 @@ class Parameter(models.Model):
         """Set parameter value from int"""
         if not isinstance(new_value, int):
             raise TypeError(f"Expected int, got {type(new_value).__name__}")
-        self.value = _str(new_value)
+        self._run_validators(new_value)
+        self._set_raw_value(_str(new_value))
         self.save()
 
     def set_str(self, new_value: Any) -> None:
         """Set parameter value from str"""
         if not isinstance(new_value, str):
             raise TypeError(f"Expected str, got {type(new_value).__name__}")
-        self.value = new_value
+        self._set_raw_value(new_value)
         self.save()
 
     def set_float(self, new_value: Any) -> None:
         """Set parameter value from float"""
         if not isinstance(new_value, float):
             raise TypeError(f"Expected float, got {type(new_value).__name__}")
-        self.value = _str(new_value)
+        self._set_raw_value(_str(new_value))
         self.save()
 
     def set_decimal(self, new_value: Any) -> None:
         """Set parameter value from Decimal"""
         if not isinstance(new_value, Decimal):
             raise TypeError(f"Expected Decimal, got {type(new_value).__name__}")
-        self.value = _str(new_value)
+        self._set_raw_value(_str(new_value))
         self.save()
 
     def set_json(self, new_value: Any) -> None:
         """Set parameter value from JSON-serializable object"""
-        self.value = json.dumps(new_value)
+        self._set_raw_value(json.dumps(new_value))
         self.save()
 
     def set_bool(self, new_value: Any) -> None:
         """Set parameter value from bool"""
         if not isinstance(new_value, bool):
             raise TypeError(f"Expected bool, got {type(new_value).__name__}")
-        self.value = "1" if new_value else "0"
+        self._set_raw_value("1" if new_value else "0")
         self.save()
 
     def set_date(self, new_value: Any) -> None:
         """Set parameter value from date object"""
         if not isinstance(new_value, date_type):
             raise TypeError(f"Expected date, got {type(new_value).__name__}")
-        self.value = new_value.isoformat()
+        self._set_raw_value(new_value.isoformat())
         self.save()
 
     def set_datetime(self, new_value: Any) -> None:
         """Set parameter value from datetime object"""
         if not isinstance(new_value, datetime_type):
             raise TypeError(f"Expected datetime, got {type(new_value).__name__}")
-        self.value = new_value.isoformat()
+        self._set_raw_value(new_value.isoformat())
         self.save()
 
     def set_time(self, new_value: Any) -> None:
         """Set parameter value from time object"""
         if not isinstance(new_value, time_type):
             raise TypeError(f"Expected time, got {type(new_value).__name__}")
-        self.value = new_value.strftime("%H:%M:%S")
+        self._set_raw_value(new_value.strftime("%H:%M:%S"))
         self.save()
 
     def set_url(self, new_value: Any) -> None:
@@ -427,7 +456,7 @@ class Parameter(models.Model):
             validator(url_value)
         except ValidationError as e:
             raise ValueError(f"Invalid URL: {url_value}") from e
-        self.value = url_value
+        self._set_raw_value(url_value)
         self.save()
 
     def set_email(self, new_value: Any) -> None:
@@ -439,7 +468,7 @@ class Parameter(models.Model):
             validate_email(email_value)
         except ValidationError as e:
             raise ValueError(f"Invalid email: {email_value}") from e
-        self.value = email_value
+        self._set_raw_value(email_value)
         self.save()
 
     def set_list(self, new_value: Any) -> None:
@@ -447,28 +476,28 @@ class Parameter(models.Model):
         if not isinstance(new_value, list):
             raise TypeError(f"Expected list, got {type(new_value).__name__}")
         typed_list = cast(_list[Any], new_value)
-        self.value = ", ".join(str(item) for item in typed_list)
+        self._set_raw_value(", ".join(str(item) for item in typed_list))
         self.save()
 
     def set_dict(self, new_value: Any) -> None:
         """Set parameter value from dict"""
         if not isinstance(new_value, dict):
             raise TypeError(f"Expected dict, got {type(new_value).__name__}")
-        self.value = json.dumps(new_value)
+        self._set_raw_value(json.dumps(new_value))
         self.save()
 
     def set_path(self, new_value: Any) -> None:
         """Set parameter value from Path object"""
         if not isinstance(new_value, Path):
             raise TypeError(f"Expected Path, got {type(new_value).__name__}")
-        self.value = _str(new_value)
+        self._set_raw_value(_str(new_value))
         self.save()
 
     def set_duration(self, new_value: Any) -> None:
         """Set parameter value from timedelta object"""
         if not isinstance(new_value, timedelta):
             raise TypeError(f"Expected timedelta, got {type(new_value).__name__}")
-        self.value = _str(new_value.total_seconds())
+        self._set_raw_value(_str(new_value.total_seconds()))
         self.save()
 
     def set_percentage(self, new_value: Any) -> None:
@@ -477,19 +506,20 @@ class Parameter(models.Model):
             raise TypeError(f"Expected float or int, got {type(new_value).__name__}")
         if not 0 <= new_value <= 100:
             raise ValueError(f"Percentage must be between 0 and 100, got {new_value}")
-        self.value = _str(new_value)
+        self._set_raw_value(_str(new_value))
         self.save()
 
     def to_dict(self) -> ParameterDict:
         """Export this parameter instance to JSON-compatible dictionary.
 
         Returns:
-            Dictionary with all parameter fields and validators
+            Dictionary with all parameter fields and validators.
+            Note: The value is exported in decrypted form for portability.
         """
         param_data: ParameterDict = {
             "name": self.name,
             "slug": self.slug,
-            "value": self.value,
+            "value": self._get_raw_value(),  # Export decrypted value
             "value_type": self.value_type,
             "description": self.description,
             "is_global": self.is_global,
