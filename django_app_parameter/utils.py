@@ -20,6 +20,7 @@ from django.core.validators import (
     validate_ipv6_address,
     validate_slug,
 )
+from django.utils.text import slugify
 
 try:
     from cryptography.fernet import Fernet
@@ -30,6 +31,17 @@ HAS_CRYPTOGRAPHY = Fernet is not None
 
 # Cache for imported validators to avoid repeated imports
 _VALIDATOR_CACHE: dict[str, Any] = {}
+
+
+def parameter_slugify(content: str) -> str:
+    """
+    Transform content :
+    * slugify (with django's function)
+    * upperise
+    * replace dash (-) with underscore (_)
+    """
+    return slugify(content).upper().replace("-", "_")
+
 
 # Built-in Django validators that are available by default
 BUILTIN_VALIDATORS: dict[str, Any] = {

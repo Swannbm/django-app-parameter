@@ -2,21 +2,26 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Callable
 from datetime import date as date_type
 from datetime import datetime as datetime_type
 from datetime import time as time_type
 from datetime import timedelta
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Callable, cast  # noqa: UP035
+from typing import Any, TypedDict, cast
 
 from django.core.exceptions import ImproperlyConfigured, ValidationError
 from django.core.validators import URLValidator, validate_email
 from django.db import models
-from django.utils.text import slugify
-from typing_extensions import NotRequired, TypedDict
 
-logger = logging.getLogger(__name__)
+from django_app_parameter.utils import (
+    decrypt_value,
+    encrypt_value,
+    get_available_validators,
+    get_validator_from_registry,
+    parameter_slugify,
+)
 
 
 class ValidatorDict(TypedDict):
@@ -26,8 +31,8 @@ class ValidatorDict(TypedDict):
     validator_params: dict[str, Any]
 
 
-class ParameterDict(TypedDict):
-    """Structure for parameter data in JSON export/import"""
+class _ParameterDictRequired(TypedDict):
+    """Required fields for ParameterDict"""
 
     name: str
     slug: str
@@ -35,17 +40,15 @@ class ParameterDict(TypedDict):
     value_type: str
     description: str
     is_global: bool
-    validators: NotRequired[list[ValidatorDict]]
 
 
-def parameter_slugify(content: str) -> str:
-    """
-    Transform content :
-    * slugify (with django's function)
-    * upperise
-    * replace dash (-) with underscore (_)
-    """
-    return slugify(content).upper().replace("-", "_")
+class ParameterDict(_ParameterDictRequired, total=False):
+    """Structure for parameter data in JSON export/import"""
+
+    validators: list[ValidatorDict]
+
+
+logger = logging.getLogger(__name__)
 
 
 # Type aliasing because there is method name conflict
@@ -218,8 +221,6 @@ class Parameter(models.Model):
             The decrypted value if enable_cypher is True, otherwise the raw value
         """
         if self.enable_cypher:
-            from django_app_parameter.utils import decrypt_value
-
             return decrypt_value(self.value)
         return self.value
 
@@ -231,8 +232,6 @@ class Parameter(models.Model):
             value: The plaintext value to store (will be encrypted if needed)
         """
         if self.enable_cypher:
-            from django_app_parameter.utils import encrypt_value
-
             self.value = encrypt_value(value)
         else:
             self.value = value
@@ -660,9 +659,6 @@ class ParameterValidator(models.Model):
         Raises:
             ValueError: If validator_type is not found in built-in or custom validators
         """
-        # Import here to avoid circular imports (utils.py uses Django validators)
-        from django_app_parameter.utils import get_validator_from_registry
-
         # Get validator class/function from registry (built-in or custom)
         validator_class = get_validator_from_registry(self.validator_type)
 
@@ -684,9 +680,6 @@ class ParameterValidator(models.Model):
         return cast(Callable[[Any], None], validator_class(**params))
 
     def __str__(self) -> _str:
-        # Import here to avoid circular imports (utils.py uses Django validators)
-        from django_app_parameter.utils import get_available_validators
-
         available = get_available_validators()
         display_name = available.get(self.validator_type, self.validator_type)
         return f"{self.parameter.name} - {display_name}"

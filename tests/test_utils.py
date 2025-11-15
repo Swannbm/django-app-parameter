@@ -2,13 +2,13 @@
 
 import pytest
 
-from django_app_parameter.models import parameter_slugify
 from django_app_parameter.utils import (
     clear_validator_cache,
     get_available_validators,
     get_setting,
     get_validator_from_registry,
     import_validator,
+    parameter_slugify,
 )
 
 
