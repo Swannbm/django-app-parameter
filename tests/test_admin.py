@@ -530,8 +530,8 @@ class TestParameterAdminHelpers:
         )
 
         inlines = admin.get_inlines(request, obj=param)
-        # When editing, should have validator inline
-        assert len(inlines) == 1
+        # When editing, should have validator and history inlines
+        assert len(inlines) == 2
 
     def test_get_current_value_date(self):
         """Test _get_current_value with DATE type"""

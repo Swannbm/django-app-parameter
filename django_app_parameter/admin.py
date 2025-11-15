@@ -7,7 +7,7 @@ from django.contrib import admin
 from django.forms import ModelForm
 from django.http import HttpRequest
 
-from django_app_parameter.models import Parameter, ParameterValidator
+from django_app_parameter.models import Parameter, ParameterHistory, ParameterValidator
 
 if TYPE_CHECKING:
     from django.contrib.admin import ModelAdmin as BaseModelAdmin
@@ -16,9 +16,12 @@ if TYPE_CHECKING:
     class _ModelAdmin(BaseModelAdmin[Parameter]): ...
 
     class _TabularInline(BaseTabularInline[ParameterValidator]): ...
+
+    class _HistoryTabularInline(BaseTabularInline[ParameterHistory]): ...
 else:
     _ModelAdmin = admin.ModelAdmin
     _TabularInline = admin.TabularInline
+    _HistoryTabularInline = admin.TabularInline
 
 
 class ParameterCreateForm(forms.ModelForm):
@@ -26,11 +29,23 @@ class ParameterCreateForm(forms.ModelForm):
 
     class Meta:
         model = Parameter
-        fields = ["name", "slug", "value_type", "description", "is_global"]
+        fields = [
+            "name",
+            "slug",
+            "value_type",
+            "description",
+            "is_global",
+            "enable_cypher",
+            "enable_history",
+        ]
         help_texts = {
             "name": "Nom du paramètre",
             "slug": "Laissez vide pour générer automatiquement depuis le nom",
             "value_type": "Le type ne pourra plus être modifié après création",
+            "enable_cypher": "Si activé, la valeur sera chiffrée en base de données",
+            "enable_history": (
+                "Si activé, les modifications de valeur seront enregistrées"
+            ),
         }
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
@@ -45,7 +60,14 @@ class ParameterEditForm(forms.ModelForm):
 
     class Meta:
         model = Parameter
-        fields = ["name", "description", "value", "is_global"]
+        fields = [
+            "name",
+            "description",
+            "value",
+            "is_global",
+            "enable_cypher",
+            "enable_history",
+        ]
 
     def _convert_value_to_type(self, value: Any, value_type: str) -> Any:
         """Convert a value to its appropriate type for validation.
@@ -168,6 +190,22 @@ class ParameterValidatorInline(_TabularInline):
     fields = ["validator_type", "validator_params"]
 
 
+class ParameterHistoryInline(_HistoryTabularInline):
+    """Inline admin for displaying parameter history (read-only)"""
+
+    model = ParameterHistory
+    extra = 0
+    fields = ["value", "modified_at"]
+    readonly_fields = ["value", "modified_at"]
+    can_delete = False
+
+    def has_add_permission(
+        self, request: HttpRequest, obj: Parameter | None = None
+    ) -> bool:
+        """Prevent adding history entries manually"""
+        return False
+
+
 @admin.register(Parameter)
 class ParameterAdmin(_ModelAdmin):
     model = Parameter
@@ -177,8 +215,10 @@ class ParameterAdmin(_ModelAdmin):
         "slug",
         "value",
         "value_type",
+        "enable_cypher",
+        "enable_history",
     )
-    list_filter = ("value_type", "is_global")
+    list_filter = ("value_type", "is_global", "enable_cypher", "enable_history")
     search_fields = (
         "name",
         "slug",
@@ -197,11 +237,11 @@ class ParameterAdmin(_ModelAdmin):
 
     def get_inlines(
         self, request: HttpRequest, obj: Parameter | None = None
-    ) -> list[type[ParameterValidatorInline]]:
-        """Show validators inline only when editing"""
+    ) -> list[type[ParameterValidatorInline] | type[ParameterHistoryInline]]:
+        """Show validators and history inlines only when editing"""
         del request  # Unused but required by signature
         if obj:  # Editing
-            return [ParameterValidatorInline]
+            return [ParameterValidatorInline, ParameterHistoryInline]
         return []  # Creating - no inlines
 
     def _get_field_mapping(

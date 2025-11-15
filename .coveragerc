@@ -15,6 +15,9 @@ exclude_lines =
     raise NotImplementedError
     if __name__ == .__main__.:
     if TYPE_CHECKING:
+    except ImportError:
+    Fernet = None
+    InvalidToken = None
 precision = 2
 show_missing = True
 skip_covered = False
