@@ -46,6 +46,8 @@ class ParameterDict(_ParameterDictRequired, total=False):
     """Structure for parameter data in JSON export/import"""
 
     validators: list[ValidatorDict]
+    enable_cypher: bool
+    enable_history: bool
 
 
 logger = logging.getLogger(__name__)
@@ -207,6 +209,14 @@ class Parameter(models.Model):
         default=False,
         help_text="Si activé, la valeur sera chiffrée en base de données",
     )
+    enable_history = models.BooleanField(
+        "Historisation activée",
+        default=False,
+        help_text=(
+            "Si activé, les modifications de valeur seront "
+            "enregistrées dans l'historique"
+        ),
+    )
 
     def save(self, *args: Any, **kwargs: Any) -> None:
         if not self.slug:
@@ -356,6 +366,27 @@ class Parameter(models.Model):
             )
             validator(value)
 
+    def _save_to_history(self, new_raw_value: _str) -> None:
+        """Save current value to history if enable_history is True and value changed.
+
+        Args:
+            new_raw_value: The new value to be saved (in raw string format)
+        """
+        # Only save to history if:
+        # 1. History is enabled
+        # 2. Instance has a pk (is saved in DB)
+        # 3. Value is different from current value
+        if self.enable_history and self.pk and self.value != new_raw_value:
+            logger.info("Saving to history for parameter %s", self.slug)
+            # Import here to avoid circular import
+            from django_app_parameter.models import ParameterHistory
+
+            # Save current value to history before updating
+            ParameterHistory.objects.create(
+                parameter=self,
+                value=self.value,  # Save current (old) value
+            )
+
     def set(self, new_value: Any) -> None:
         """Set parameter value with automatic conversion based on value_type"""
         # Run validators before conversion
@@ -388,13 +419,20 @@ class Parameter(models.Model):
         if not isinstance(new_value, int):
             raise TypeError(f"Expected int, got {type(new_value).__name__}")
         self._run_validators(new_value)
-        self._set_raw_value(_str(new_value))
+        new_raw_value = _str(new_value)
+        encrypted_value = (
+            encrypt_value(new_raw_value) if self.enable_cypher else new_raw_value
+        )
+        self._save_to_history(encrypted_value)
+        self._set_raw_value(new_raw_value)
         self.save()
 
     def set_str(self, new_value: Any) -> None:
         """Set parameter value from str"""
         if not isinstance(new_value, str):
             raise TypeError(f"Expected str, got {type(new_value).__name__}")
+        encrypted_value = encrypt_value(new_value) if self.enable_cypher else new_value
+        self._save_to_history(encrypted_value)
         self._set_raw_value(new_value)
         self.save()
 
@@ -402,47 +440,82 @@ class Parameter(models.Model):
         """Set parameter value from float"""
         if not isinstance(new_value, float):
             raise TypeError(f"Expected float, got {type(new_value).__name__}")
-        self._set_raw_value(_str(new_value))
+        new_raw_value = _str(new_value)
+        encrypted_value = (
+            encrypt_value(new_raw_value) if self.enable_cypher else new_raw_value
+        )
+        self._save_to_history(encrypted_value)
+        self._set_raw_value(new_raw_value)
         self.save()
 
     def set_decimal(self, new_value: Any) -> None:
         """Set parameter value from Decimal"""
         if not isinstance(new_value, Decimal):
             raise TypeError(f"Expected Decimal, got {type(new_value).__name__}")
-        self._set_raw_value(_str(new_value))
+        new_raw_value = _str(new_value)
+        encrypted_value = (
+            encrypt_value(new_raw_value) if self.enable_cypher else new_raw_value
+        )
+        self._save_to_history(encrypted_value)
+        self._set_raw_value(new_raw_value)
         self.save()
 
     def set_json(self, new_value: Any) -> None:
         """Set parameter value from JSON-serializable object"""
-        self._set_raw_value(json.dumps(new_value))
+        new_raw_value = json.dumps(new_value)
+        encrypted_value = (
+            encrypt_value(new_raw_value) if self.enable_cypher else new_raw_value
+        )
+        self._save_to_history(encrypted_value)
+        self._set_raw_value(new_raw_value)
         self.save()
 
     def set_bool(self, new_value: Any) -> None:
         """Set parameter value from bool"""
         if not isinstance(new_value, bool):
             raise TypeError(f"Expected bool, got {type(new_value).__name__}")
-        self._set_raw_value("1" if new_value else "0")
+        new_raw_value = "1" if new_value else "0"
+        encrypted_value = (
+            encrypt_value(new_raw_value) if self.enable_cypher else new_raw_value
+        )
+        self._save_to_history(encrypted_value)
+        self._set_raw_value(new_raw_value)
         self.save()
 
     def set_date(self, new_value: Any) -> None:
         """Set parameter value from date object"""
         if not isinstance(new_value, date_type):
             raise TypeError(f"Expected date, got {type(new_value).__name__}")
-        self._set_raw_value(new_value.isoformat())
+        new_raw_value = new_value.isoformat()
+        encrypted_value = (
+            encrypt_value(new_raw_value) if self.enable_cypher else new_raw_value
+        )
+        self._save_to_history(encrypted_value)
+        self._set_raw_value(new_raw_value)
         self.save()
 
     def set_datetime(self, new_value: Any) -> None:
         """Set parameter value from datetime object"""
         if not isinstance(new_value, datetime_type):
             raise TypeError(f"Expected datetime, got {type(new_value).__name__}")
-        self._set_raw_value(new_value.isoformat())
+        new_raw_value = new_value.isoformat()
+        encrypted_value = (
+            encrypt_value(new_raw_value) if self.enable_cypher else new_raw_value
+        )
+        self._save_to_history(encrypted_value)
+        self._set_raw_value(new_raw_value)
         self.save()
 
     def set_time(self, new_value: Any) -> None:
         """Set parameter value from time object"""
         if not isinstance(new_value, time_type):
             raise TypeError(f"Expected time, got {type(new_value).__name__}")
-        self._set_raw_value(new_value.strftime("%H:%M:%S"))
+        new_raw_value = new_value.strftime("%H:%M:%S")
+        encrypted_value = (
+            encrypt_value(new_raw_value) if self.enable_cypher else new_raw_value
+        )
+        self._save_to_history(encrypted_value)
+        self._set_raw_value(new_raw_value)
         self.save()
 
     def set_url(self, new_value: Any) -> None:
@@ -455,6 +528,10 @@ class Parameter(models.Model):
             validator(url_value)
         except ValidationError as e:
             raise ValueError(f"Invalid URL: {url_value}") from e
+        encrypted_value = (
+            encrypt_value(url_value) if self.enable_cypher else url_value
+        )
+        self._save_to_history(encrypted_value)
         self._set_raw_value(url_value)
         self.save()
 
@@ -467,6 +544,10 @@ class Parameter(models.Model):
             validate_email(email_value)
         except ValidationError as e:
             raise ValueError(f"Invalid email: {email_value}") from e
+        encrypted_value = (
+            encrypt_value(email_value) if self.enable_cypher else email_value
+        )
+        self._save_to_history(encrypted_value)
         self._set_raw_value(email_value)
         self.save()
 
@@ -475,28 +556,48 @@ class Parameter(models.Model):
         if not isinstance(new_value, list):
             raise TypeError(f"Expected list, got {type(new_value).__name__}")
         typed_list = cast(_list[Any], new_value)
-        self._set_raw_value(", ".join(str(item) for item in typed_list))
+        new_raw_value = ", ".join(str(item) for item in typed_list)
+        encrypted_value = (
+            encrypt_value(new_raw_value) if self.enable_cypher else new_raw_value
+        )
+        self._save_to_history(encrypted_value)
+        self._set_raw_value(new_raw_value)
         self.save()
 
     def set_dict(self, new_value: Any) -> None:
         """Set parameter value from dict"""
         if not isinstance(new_value, dict):
             raise TypeError(f"Expected dict, got {type(new_value).__name__}")
-        self._set_raw_value(json.dumps(new_value))
+        new_raw_value = json.dumps(new_value)
+        encrypted_value = (
+            encrypt_value(new_raw_value) if self.enable_cypher else new_raw_value
+        )
+        self._save_to_history(encrypted_value)
+        self._set_raw_value(new_raw_value)
         self.save()
 
     def set_path(self, new_value: Any) -> None:
         """Set parameter value from Path object"""
         if not isinstance(new_value, Path):
             raise TypeError(f"Expected Path, got {type(new_value).__name__}")
-        self._set_raw_value(_str(new_value))
+        new_raw_value = _str(new_value)
+        encrypted_value = (
+            encrypt_value(new_raw_value) if self.enable_cypher else new_raw_value
+        )
+        self._save_to_history(encrypted_value)
+        self._set_raw_value(new_raw_value)
         self.save()
 
     def set_duration(self, new_value: Any) -> None:
         """Set parameter value from timedelta object"""
         if not isinstance(new_value, timedelta):
             raise TypeError(f"Expected timedelta, got {type(new_value).__name__}")
-        self._set_raw_value(_str(new_value.total_seconds()))
+        new_raw_value = _str(new_value.total_seconds())
+        encrypted_value = (
+            encrypt_value(new_raw_value) if self.enable_cypher else new_raw_value
+        )
+        self._save_to_history(encrypted_value)
+        self._set_raw_value(new_raw_value)
         self.save()
 
     def set_percentage(self, new_value: Any) -> None:
@@ -504,8 +605,15 @@ class Parameter(models.Model):
         if not isinstance(new_value, float | int):
             raise TypeError(f"Expected float or int, got {type(new_value).__name__}")
         if not 0 <= new_value <= 100:
-            raise ValueError(f"Percentage must be between 0 and 100, got {new_value}")
-        self._set_raw_value(_str(new_value))
+            raise ValueError(
+                f"Percentage must be between 0 and 100, got {new_value}"
+            )
+        new_raw_value = _str(new_value)
+        encrypted_value = (
+            encrypt_value(new_raw_value) if self.enable_cypher else new_raw_value
+        )
+        self._save_to_history(encrypted_value)
+        self._set_raw_value(new_raw_value)
         self.save()
 
     def to_dict(self) -> ParameterDict:
@@ -514,6 +622,7 @@ class Parameter(models.Model):
         Returns:
             Dictionary with all parameter fields and validators.
             Note: The value is exported in decrypted form for portability.
+            History entries are NOT exported.
         """
         param_data: ParameterDict = {
             "name": self.name,
@@ -522,6 +631,8 @@ class Parameter(models.Model):
             "value_type": self.value_type,
             "description": self.description,
             "is_global": self.is_global,
+            "enable_cypher": self.enable_cypher,
+            "enable_history": self.enable_history,
         }
 
         # Add validators if any
@@ -548,12 +659,15 @@ class Parameter(models.Model):
                   already exists (has a pk), as they should not be changed.
                   Validators are always processed: if not present in data, existing
                   validators are removed.
+                  History entries are NOT imported.
         """
         # Update basic fields
         self.name = data.get("name", self.name)
         self.value = data.get("value", self.value)
         self.description = data.get("description", self.description)
         self.is_global = data.get("is_global", self.is_global)
+        self.enable_cypher = data.get("enable_cypher", self.enable_cypher)
+        self.enable_history = data.get("enable_history", self.enable_history)
 
         # Only update slug and value_type if instance is new (no pk)
         if not self.pk:
@@ -683,3 +797,32 @@ class ParameterValidator(models.Model):
         available = get_available_validators()
         display_name = available.get(self.validator_type, self.validator_type)
         return f"{self.parameter.name} - {display_name}"
+
+
+class ParameterHistory(models.Model):
+    """Stores historical values of a Parameter"""
+
+    parameter = models.ForeignKey(
+        Parameter,
+        on_delete=models.CASCADE,
+        related_name="history",
+        verbose_name="Paramètre",
+    )
+    value = models.CharField(
+        "Valeur précédente",
+        max_length=250,
+        help_text="Valeur du paramètre avant modification",
+    )
+    modified_at = models.DateTimeField(
+        "Date de modification",
+        auto_now_add=True,
+        help_text="Date et heure de la modification",
+    )
+
+    class Meta:
+        verbose_name = "Historique de paramètre"
+        verbose_name_plural = "Historiques de paramètres"
+        ordering = ["-modified_at"]
+
+    def __str__(self) -> _str:
+        return f"{self.value} - {self.modified_at.strftime('%Y-%m-%d %H:%M:%S')}"
