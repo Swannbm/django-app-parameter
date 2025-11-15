@@ -749,7 +749,7 @@ class TestLoadParamMC:
                 },
             ]
         )
-        call_command("load_param", json=data)
+        call_command("dap_load", json=data)
         param1 = Parameter.objects.get(slug="HELLO_ZE_WORLD")
         assert param1.str() == "yes"
         assert param1.name == "hello ze world"
@@ -760,7 +760,7 @@ class TestLoadParamMC:
         assert param2.value_type == Parameter.TYPES.INT
 
     def test_file_options(self):
-        call_command("load_param", file="django_app_parameter/data_for_test.json")
+        call_command("dap_load", file="django_app_parameter/data_for_test.json")
         param1 = Parameter.objects.get(slug="HELLO_ZE_WORLD")
         assert param1.str() == "yes"
         assert param1.name == "hello ze world"
@@ -787,7 +787,7 @@ class TestLoadParamMC:
             ),
             "no_update": True,
         }
-        call_command("load_param", **kwargs)
+        call_command("dap_load", **kwargs)
         assert app_parameter.BIRTH_YEAR == 1983
         assert Parameter.objects.filter(name="new name").exists() is False
         assert app_parameter.CREATED == "true"
@@ -826,7 +826,7 @@ class TestLoadParamWithValidators:
                 }
             ]
         )
-        call_command("load_param", json=data)
+        call_command("dap_load", json=data)
 
         param = Parameter.objects.get(slug="MAX_ITEMS")
         assert param.validators.count() == 1
@@ -856,7 +856,7 @@ class TestLoadParamWithValidators:
                 }
             ]
         )
-        call_command("load_param", json=data)
+        call_command("dap_load", json=data)
 
         param = Parameter.objects.get(slug="USER_AGE")
         assert param.validators.count() == 2
@@ -884,7 +884,7 @@ class TestLoadParamWithValidators:
                 }
             ]
         )
-        call_command("load_param", json=data)
+        call_command("dap_load", json=data)
 
         param = Parameter.objects.get(slug="EVEN_NUMBER")
         assert param.validators.count() == 1
@@ -911,7 +911,7 @@ class TestLoadParamWithValidators:
                 }
             ]
         )
-        call_command("load_param", json=data)
+        call_command("dap_load", json=data)
 
         param = Parameter.objects.get(slug="SIMPLE_PARAM")
         assert param.validators.count() == 0
@@ -928,7 +928,7 @@ class TestLoadParamWithValidators:
                 }
             ]
         )
-        call_command("load_param", json=data)
+        call_command("dap_load", json=data)
 
         param = Parameter.objects.get(slug="EMPTY_VALIDATORS")
         assert param.validators.count() == 0
@@ -955,7 +955,7 @@ class TestLoadParamWithValidators:
                 }
             ]
         )
-        call_command("load_param", json=data1)
+        call_command("dap_load", json=data1)
 
         param = Parameter.objects.get(slug="MAX_SIZE")
         assert param.validators.count() == 2
@@ -976,7 +976,7 @@ class TestLoadParamWithValidators:
                 }
             ]
         )
-        call_command("load_param", json=data2)
+        call_command("dap_load", json=data2)
 
         param.refresh_from_db()
         # Should have only the new validator
@@ -1003,7 +1003,7 @@ class TestLoadParamWithValidators:
                 }
             ]
         )
-        call_command("load_param", json=data1)
+        call_command("dap_load", json=data1)
 
         param = Parameter.objects.get(slug="WITH_VALIDATORS")
         assert param.validators.count() == 1
@@ -1018,7 +1018,7 @@ class TestLoadParamWithValidators:
                 }
             ]
         )
-        call_command("load_param", json=data2)
+        call_command("dap_load", json=data2)
 
         param.refresh_from_db()
         # Validators should be removed
@@ -1041,7 +1041,7 @@ class TestLoadParamWithValidators:
                 }
             ]
         )
-        call_command("load_param", json=data)
+        call_command("dap_load", json=data)
 
         param = Parameter.objects.get(slug="EMAIL_FIELD")
         assert param.validators.count() == 1
@@ -1066,7 +1066,7 @@ class TestLoadParamWithValidators:
                 }
             ]
         )
-        call_command("load_param", json=data)
+        call_command("dap_load", json=data)
 
         param = Parameter.objects.get(slug="BAD_VALIDATOR")
         # Should create parameter but skip invalid validator
@@ -1084,7 +1084,7 @@ class TestLoadParamWithValidators:
                 }
             ]
         )
-        call_command("load_param", json=data1)
+        call_command("dap_load", json=data1)
 
         param = Parameter.objects.get(slug="GROWING_PARAM")
         assert param.validators.count() == 0
@@ -1105,7 +1105,7 @@ class TestLoadParamWithValidators:
                 }
             ]
         )
-        call_command("load_param", json=data2)
+        call_command("dap_load", json=data2)
 
         param.refresh_from_db()
         assert param.validators.count() == 1

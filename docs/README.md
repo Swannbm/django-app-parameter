@@ -27,7 +27,7 @@ title = app_parameter.BLOG_TITLE
 - [Overview](overview.md) - Features and concepts
 - [Installation](installation.md) - Setup guide
 - [Usage Guide](usage-guide.md) - Examples
-- [Management Commands](management-commands.md) - `load_param` command
+- [Management Commands](management-commands.md) - CLI tools
 - [FAQ](faq.md)
 
 ## Info

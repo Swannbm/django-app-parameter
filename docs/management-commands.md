@@ -1,15 +1,15 @@
 # Management Commands
 
-## load_param
+## dap_load
 
 Import parameters from JSON file or string.
 
 ### Syntax
 
 ```bash
-python manage.py load_param --file <path>
-python manage.py load_param --json '<json>'
-python manage.py load_param --no-update --file <path>
+python manage.py dap_load --file <path>
+python manage.py dap_load --json '<json>'
+python manage.py dap_load --no-update --file <path>
 ```
 
 ### Options
@@ -22,13 +22,13 @@ python manage.py load_param --no-update --file <path>
 
 ```bash
 # Import from file
-python manage.py load_param --file parameters.json
+python manage.py dap_load --file parameters.json
 
 # Import without overwriting existing
-python manage.py load_param --no-update --file defaults.json
+python manage.py dap_load --no-update --file defaults.json
 
 # Import from JSON string
-python manage.py load_param --json '[{"name": "Site Title", "value": "My Site"}]'
+python manage.py dap_load --json '[{"name": "Site Title", "value": "My Site"}]'
 ```
 
 ### JSON Format
@@ -250,7 +250,7 @@ See [utils.py](../django_app_parameter/utils.py) for validator registry implemen
 ```bash
 #!/bin/bash
 python manage.py migrate
-python manage.py load_param --no-update --file config/defaults.json
+python manage.py dap_load --no-update --file config/defaults.json
 python manage.py collectstatic --noinput
 gunicorn myproject.wsgi
 ```
@@ -258,20 +258,20 @@ gunicorn myproject.wsgi
 #### Environment Migration
 ```bash
 # Export from staging
-python manage.py dump_param staging_params.json
+python manage.py dap_dump staging_params.json
 
 # Import to production (without overwriting)
-python manage.py load_param --no-update --file staging_params.json
+python manage.py dap_load --no-update --file staging_params.json
 ```
 
-## dump_param
+## dap_dump
 
 Export all parameters to JSON file.
 
 ### Syntax
 
 ```bash
-python manage.py dump_param <file> [--indent N]
+python manage.py dap_dump <file> [--indent N]
 ```
 
 ### Arguments
@@ -283,13 +283,13 @@ python manage.py dump_param <file> [--indent N]
 
 ```bash
 # Export to file
-python manage.py dump_param backup.json
+python manage.py dap_dump backup.json
 
 # Export with no indentation (compact)
-python manage.py dump_param backup.json --indent 0
+python manage.py dap_dump backup.json --indent 0
 
 # Export with 2-space indentation
-python manage.py dump_param backup.json --indent 2
+python manage.py dap_dump backup.json --indent 2
 ```
 
 ### Output Format
@@ -337,7 +337,7 @@ Includes all fields and validators:
 
 **Backup:**
 ```bash
-python manage.py dump_param backup_$(date +%Y%m%d).json
+python manage.py dap_dump backup_$(date +%Y%m%d).json
 ```
 
 **Documentation:**

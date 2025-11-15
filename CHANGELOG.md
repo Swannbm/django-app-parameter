@@ -2,6 +2,10 @@
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Unreleased]
+
+### Changed
+* Management commands renamed with `dap_` prefix to avoid conflicts: `load_param` → `dap_load`, `dump_param` → `dap_dump`
 
 ## [2.0.0] - 2025.11.14
 

@@ -32,7 +32,7 @@ class TestDumpParamCommand:
 
         # Dump to file
         output_file = tmp_path / "output.json"
-        call_command("dump_param", str(output_file))
+        call_command("dap_dump", str(output_file))
 
         # Verify file was created
         assert output_file.exists()
@@ -79,7 +79,7 @@ class TestDumpParamCommand:
 
         # Dump to file
         output_file = tmp_path / "with_validators.json"
-        call_command("dump_param", str(output_file))
+        call_command("dap_dump", str(output_file))
 
         # Read and verify
         with open(output_file, encoding="utf-8") as f:
@@ -107,7 +107,7 @@ class TestDumpParamCommand:
         )
 
         output_file = tmp_path / "no_validators.json"
-        call_command("dump_param", str(output_file))
+        call_command("dap_dump", str(output_file))
 
         with open(output_file, encoding="utf-8") as f:
             data = json.load(f)
@@ -118,7 +118,7 @@ class TestDumpParamCommand:
     def test_dump_param_empty_database(self, tmp_path):
         """Test dump_param with no parameters in database"""
         output_file = tmp_path / "empty.json"
-        call_command("dump_param", str(output_file))
+        call_command("dap_dump", str(output_file))
 
         with open(output_file, encoding="utf-8") as f:
             data = json.load(f)
@@ -136,7 +136,7 @@ class TestDumpParamCommand:
 
         # Test with indent=2
         output_file = tmp_path / "indent2.json"
-        call_command("dump_param", str(output_file), indent=2)
+        call_command("dap_dump", str(output_file), indent=2)
 
         content = output_file.read_text(encoding="utf-8")
         # Check that file has proper indentation (2 spaces)
@@ -151,7 +151,7 @@ class TestDumpParamCommand:
         )
 
         output_file = tmp_path / "default_indent.json"
-        call_command("dump_param", str(output_file))
+        call_command("dap_dump", str(output_file))
 
         content = output_file.read_text(encoding="utf-8")
         # Check that file has proper indentation (4 spaces by default)
@@ -167,7 +167,7 @@ class TestDumpParamCommand:
         )
 
         output_file = tmp_path / "unicode.json"
-        call_command("dump_param", str(output_file))
+        call_command("dap_dump", str(output_file))
 
         with open(output_file, encoding="utf-8") as f:
             data = json.load(f)
@@ -206,7 +206,7 @@ class TestDumpParamCommand:
             )
 
         output_file = tmp_path / "all_types.json"
-        call_command("dump_param", str(output_file))
+        call_command("dap_dump", str(output_file))
 
         with open(output_file, encoding="utf-8") as f:
             data = json.load(f)
@@ -233,7 +233,7 @@ class TestDumpParamCommand:
             )
 
         output_file = tmp_path / "multiple.json"
-        call_command("dump_param", str(output_file))
+        call_command("dap_dump", str(output_file))
 
         with open(output_file, encoding="utf-8") as f:
             data = json.load(f)
@@ -272,7 +272,7 @@ class TestDumpParamCommand:
 
         # Dump
         dump_file = tmp_path / "dump.json"
-        call_command("dump_param", str(dump_file))
+        call_command("dap_dump", str(dump_file))
 
         # Read dumped data
         with open(dump_file, encoding="utf-8") as f:
@@ -283,11 +283,11 @@ class TestDumpParamCommand:
         assert Parameter.objects.count() == 0
 
         # Load back
-        call_command("load_param", file=str(dump_file))
+        call_command("dap_load", file=str(dump_file))
 
         # Dump again
         dump_file2 = tmp_path / "dump2.json"
-        call_command("dump_param", str(dump_file2))
+        call_command("dap_dump", str(dump_file2))
 
         # Read second dump
         with open(dump_file2, encoding="utf-8") as f:
@@ -301,7 +301,7 @@ class TestDumpParamCommand:
         from django.core.management import CommandError
 
         with pytest.raises((SystemExit, CommandError, TypeError)):
-            call_command("dump_param")
+            call_command("dap_dump")
 
     def test_dump_param_creates_parent_directories(self, tmp_path):
         """Test that dump_param creates parent directories if needed"""
@@ -323,7 +323,7 @@ class TestDumpParamCommand:
         # Let's create them first to test the command works
         nested_path.mkdir(parents=True, exist_ok=True)
 
-        call_command("dump_param", str(output_file))
+        call_command("dap_dump", str(output_file))
 
         assert output_file.exists()
 
@@ -336,7 +336,7 @@ class TestDumpParamCommand:
         )
 
         output_file = tmp_path / "output.json"
-        call_command("dump_param", str(output_file))
+        call_command("dap_dump", str(output_file))
 
         # Capture stdout
         captured = capsys.readouterr()
@@ -356,7 +356,7 @@ class TestDumpParamCommand:
             )
 
         output_file = tmp_path / "output.json"
-        call_command("dump_param", str(output_file))
+        call_command("dap_dump", str(output_file))
 
         captured = capsys.readouterr()
 
