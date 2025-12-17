@@ -326,9 +326,8 @@ class TestRotateKeyCommandExceptionHandling:
 
         # Mock get_setting to raise exception
         with patch(
-            "django_app_parameter.management.commands"
-            ".dap_rotate_key.get_setting"
-            ) as mock_get:
+            "django_app_parameter.management.commands.dap_rotate_key.get_setting"
+        ) as mock_get:
             mock_get.side_effect = Exception("Settings error")
 
             out = StringIO()
@@ -400,9 +399,8 @@ class TestRotateKeyCommandExceptionHandling:
 
         # Mock encrypt_value to raise exception
         with patch(
-            "django_app_parameter.management.commands."
-            "dap_rotate_key.encrypt_value"
-            ) as mock_encrypt:
+            "django_app_parameter.management.commands.dap_rotate_key.encrypt_value"
+        ) as mock_encrypt:
             mock_encrypt.side_effect = Exception("Encryption error")
 
             out = StringIO()

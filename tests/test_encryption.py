@@ -78,9 +78,7 @@ class TestEncryptionUtilities:
         assert key == custom_key_bytes
         assert isinstance(key, bytes)
 
-    def test_get_encryption_key_from_settings_as_bytes(
-        self, settings, encryption_key
-    ):
+    def test_get_encryption_key_from_settings_as_bytes(self, settings, encryption_key):
         """Test get_encryption_key when settings key is already bytes."""
         if not hasattr(settings, "DJANGO_APP_PARAMETER"):
             settings.DJANGO_APP_PARAMETER = {}
