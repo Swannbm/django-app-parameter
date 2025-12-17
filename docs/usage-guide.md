@@ -434,7 +434,7 @@ Usage:
 {% endif %}
 ```
 
-**Note**: Only `is_global=True` parameters available. Always strings in templates.
+**Note**: Only `is_global=True` parameters are available in templates. Parameters are passed in their declared format (int, bool, etc.).
 
 ## Advanced Patterns
 

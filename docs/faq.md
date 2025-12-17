@@ -229,7 +229,7 @@ Set `is_global=True` on parameter:
 <title>{{ SITE_TITLE }}</title>
 ```
 
-**Note**: Always strings in templates, regardless of `value_type`.
+**Note**: Parameters are passed in their declared format (int, bool, date, etc.).
 
 ### Why `is_global`?
 Security: Prevents exposing sensitive params to templates.
