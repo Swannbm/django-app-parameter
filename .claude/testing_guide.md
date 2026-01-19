@@ -32,10 +32,10 @@ tests/
 
 ### Fichiers de test par composant
 
-**[test_django_app_parameter.py](tests/test_django_app_parameter.py)** (2,063 lignes):
-- Tests du modèle Parameter
-- Tests des getters pour tous les types
-- Tests des setters avec validation
+**[test_django_app_parameter.py](tests/test_django_app_parameter.py)**:
+- Tests du modèle Parameter et des proxy classes
+- Tests de `get()` pour tous les types
+- Tests de `set()` avec validation et `auto_cast`
 - Tests du ParameterManager
 - Tests du proxy app_parameter
 - Tests du context processor
@@ -223,11 +223,11 @@ def test_create_parameter(db):
     """Test création simple d'un paramètre"""
     param = Parameter.objects.create(
         name="Test Param",
-        value_type=Parameter.TYPES.STR,
+        value_type=TYPES.STR,
         value="test value"
     )
     assert param.slug == "TEST_PARAM"
-    assert param.str() == "test value"
+    assert param.get() == "test value"
 ```
 
 ### Utiliser des fixtures
@@ -238,22 +238,22 @@ def string_parameter(db):
     """Fixture réutilisable"""
     return Parameter.objects.create(
         name="Test String",
-        value_type=Parameter.TYPES.STR,
+        value_type=TYPES.STR,
         value="test value"
     )
 
 def test_with_fixture(string_parameter):
     """Test utilisant la fixture"""
-    assert string_parameter.str() == "test value"
+    assert string_parameter.get() == "test value"
 ```
 
 ### Tests paramétrés
 
 ```python
 @pytest.mark.parametrize("value_type,value,expected", [
-    (Parameter.TYPES.INT, "42", 42),
-    (Parameter.TYPES.FLT, "3.14", 3.14),
-    (Parameter.TYPES.BOO, "true", True),
+    (TYPES.INT, "42", 42),
+    (TYPES.FLT, "3.14", 3.14),
+    (TYPES.BOO, "true", True),
 ])
 def test_parameter_conversion(db, value_type, value, expected):
     """Un test pour plusieurs cas"""
@@ -282,16 +282,16 @@ def test_invalid_value(db):
     """Test validation"""
     param = Parameter.objects.create(
         name="Age",
-        value_type=Parameter.TYPES.INT,
+        value_type=TYPES.INT,
         value="100"
     )
-    param.parametervalidator_set.create(
-        validator_type="max_value",
+    param.validators.create(
+        validator_type="MaxValueValidator",
         validator_params={"limit_value": 50}
     )
 
     with pytest.raises(ValidationError):
-        param.set_int(99)
+        param.set(99)
 ```
 
 ### Tests avec Django test client
@@ -322,7 +322,7 @@ def test_admin_create_parameter(admin_client):
     data = {
         "name": "New Param",
         "value": "test",
-        "value_type": Parameter.TYPES.STR,
+        "value_type": TYPES.STR,
         "description": "Test description",
         "is_global": False,
     }
@@ -348,7 +348,7 @@ def test_dump_param_command(db, tmp_path):
     # Créer des paramètres
     Parameter.objects.create(
         name="Test",
-        value_type=Parameter.TYPES.STR,
+        value_type=TYPES.STR,
         value="test"
     )
 
@@ -399,7 +399,7 @@ class TestParameterModel:
         """Test génération automatique du slug"""
         param = Parameter.objects.create(
             name="My Parameter Name",
-            value_type=Parameter.TYPES.STR,
+            value_type=TYPES.STR,
             value="value"
         )
         assert param.slug == "MY_PARAMETER_NAME"
@@ -408,44 +408,56 @@ class TestParameterModel:
         """Test méthode __str__"""
         param = Parameter.objects.create(
             name="Test",
-            value_type=Parameter.TYPES.STR,
+            value_type=TYPES.STR,
             value="value"
         )
-        assert str(param) == "Test (TEST)"
+        assert str(param) == "Test"
 
     def test_type_conversion_int(self, db):
         """Test conversion vers int"""
         param = Parameter.objects.create(
             name="Age",
-            value_type=Parameter.TYPES.INT,
+            value_type=TYPES.INT,
             value="42"
         )
-        assert param.int() == 42
-        assert isinstance(param.int(), int)
+        assert param.get() == 42
+        assert isinstance(param.get(), int)
 
     def test_set_with_validation(self, db):
         """Test setter avec validation"""
         param = Parameter.objects.create(
             name="Score",
-            value_type=Parameter.TYPES.INT,
+            value_type=TYPES.INT,
             value="50"
         )
-        param.parametervalidator_set.create(
-            validator_type="min_value",
+        param.validators.create(
+            validator_type="MinValueValidator",
             validator_params={"limit_value": 0}
         )
-        param.parametervalidator_set.create(
-            validator_type="max_value",
+        param.validators.create(
+            validator_type="MaxValueValidator",
             validator_params={"limit_value": 100}
         )
 
         # Valeur valide
-        param.set_int(75)
-        assert param.int() == 75
+        param.set(75)
+        assert param.get() == 75
 
         # Valeur invalide
         with pytest.raises(ValidationError):
-            param.set_int(150)
+            param.set(150)
+
+    def test_set_with_auto_cast(self, db):
+        """Test setter avec auto_cast"""
+        param = Parameter.objects.create(
+            name="Count",
+            value_type=TYPES.INT,
+            value="10"
+        )
+
+        # auto_cast=True convertit string en int
+        param.set("42", auto_cast=True)
+        assert param.get() == 42
 ```
 
 ### Tests de Manager
@@ -458,28 +470,18 @@ class TestParameterManager:
         """Test récupération par slug"""
         Parameter.objects.create(
             name="Test",
-            value_type=Parameter.TYPES.STR,
+            value_type=TYPES.STR,
             value="value"
         )
         param = Parameter.objects.get_from_slug("TEST")
         assert param.value == "value"
+        assert param.get() == "value"
 
     def test_get_from_slug_not_found(self, db):
         """Test slug inexistant"""
         with pytest.raises(ImproperlyConfigured) as exc_info:
             Parameter.objects.get_from_slug("NONEXISTENT")
         assert "NONEXISTENT" in str(exc_info.value)
-
-    def test_typed_getter_shortcut(self, db):
-        """Test raccourcis typés du manager"""
-        Parameter.objects.create(
-            name="Age",
-            value_type=Parameter.TYPES.INT,
-            value="42"
-        )
-        age = Parameter.objects.int("AGE")
-        assert age == 42
-        assert isinstance(age, int)
 ```
 
 ### Tests de proxy
@@ -494,7 +496,7 @@ class TestAccessParameter:
         """Test accès via proxy"""
         Parameter.objects.create(
             name="Title",
-            value_type=Parameter.TYPES.STR,
+            value_type=TYPES.STR,
             value="My Title"
         )
         title = app_parameter.TITLE
@@ -504,7 +506,7 @@ class TestAccessParameter:
         """Test conversion automatique via proxy"""
         Parameter.objects.create(
             name="Count",
-            value_type=Parameter.TYPES.INT,
+            value_type=TYPES.INT,
             value="42"
         )
         count = app_parameter.COUNT
@@ -542,14 +544,14 @@ class TestParameterAdmin:
         """Test champ booléen dans formulaire d'édition"""
         param = Parameter.objects.create(
             name="Enabled",
-            value_type=Parameter.TYPES.BOO,
+            value_type=TYPES.BOO,
             value="true"
         )
         form = ParameterEditForm(instance=param)
 
         # Le champ value doit être un BooleanField
         assert isinstance(form.fields['value'], forms.BooleanField)
-        assert form.fields['value'].initial is True
+        assert form.fields['value'].initial == param.get()  # True
 ```
 
 ### Tests de validateurs
@@ -564,11 +566,11 @@ class TestValidators:
         """Test instanciation d'un validateur"""
         param = Parameter.objects.create(
             name="Age",
-            value_type=Parameter.TYPES.INT,
+            value_type=TYPES.INT,
             value="25"
         )
-        validator_obj = param.parametervalidator_set.create(
-            validator_type="min_value",
+        validator_obj = param.validators.create(
+            validator_type="MinValueValidator",
             validator_params={"limit_value": 18}
         )
 
@@ -590,20 +592,20 @@ class TestValidators:
 
         param = Parameter.objects.create(
             name="Even Number",
-            value_type=Parameter.TYPES.INT,
+            value_type=TYPES.INT,
             value="10"
         )
-        param.parametervalidator_set.create(
+        param.validators.create(
             validator_type="even_number",
             validator_params={}
         )
 
         # Valeur paire OK
-        param.set_int(20)
+        param.set(20)
 
         # Valeur impaire erreur
         with pytest.raises(ValidationError):
-            param.set_int(15)
+            param.set(15)
 ```
 
 ## 🐛 Debugging de tests
@@ -615,13 +617,13 @@ def test_with_pdb(db):
     """Test avec point d'arrêt"""
     param = Parameter.objects.create(
         name="Test",
-        value_type=Parameter.TYPES.STR,
+        value_type=TYPES.STR,
         value="test"
     )
 
     import pdb; pdb.set_trace()  # Point d'arrêt
 
-    assert param.str() == "test"
+    assert param.get() == "test"
 
 # Exécuter avec -s pour voir pdb
 # poetry run pytest tests/test_admin.py::test_with_pdb -s

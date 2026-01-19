@@ -23,7 +23,7 @@ Remove from `INSTALLED_APPS`.
 
 **Code**:
 ```python
-Parameter.objects.create(name="Site Title", value="My Site", value_type=Parameter.TYPES.STR)
+Parameter.objects.create(name="Site Title", value="My Site", value_type=TYPES.STR)
 ```
 
 **Command**:
@@ -37,12 +37,12 @@ from django_app_parameter import app_parameter
 title = app_parameter.SITE_TITLE
 ```
 
-### `app_parameter.SLUG` vs `Parameter.objects.str("SLUG")`?
+### `app_parameter.SLUG` vs `param.get()`?
 
-- `app_parameter.SLUG`: Auto-converts based on `value_type`
-- `Parameter.objects.str()`: Explicit type
+- `app_parameter.SLUG`: Auto-converts based on `value_type`, quick access
+- `param.get()`: Same auto-conversion, but gives access to full parameter object
 
-Use `app_parameter` for simplicity, `Manager` for control.
+Use `app_parameter` for read-only access, `param.get()` when you need to modify values.
 
 ### Check if exists?
 ```python
@@ -56,12 +56,9 @@ except ImproperlyConfigured:
 ```python
 param = Parameter.objects.get(slug="TAX_RATE")
 param.set(Decimal("19.6"))  # Type-safe, validates, saves
-```
 
-Or use direct setters:
-```python
-param.set_int(42)
-param.set_date(date(2024, 12, 31))
+# Or with auto_cast for string input:
+param.set("19.6", auto_cast=True)  # Converts to Decimal, validates, saves
 ```
 
 ## Data Types
@@ -100,7 +97,7 @@ Stores duration in seconds, returns `timedelta`:
 Parameter.objects.create(
     name="Timeout",
     value="3600",  # 1 hour in seconds
-    value_type=Parameter.TYPES.DURATION
+    value_type=TYPES.DURATION
 )
 timeout = app_parameter.TIMEOUT  # timedelta(seconds=3600)
 ```
@@ -122,8 +119,8 @@ log_dir = app_parameter.LOG_DIR  # Path("/var/log/myapp")
 ### What are validators?
 Automatic validation rules attached to parameters. Validate on:
 - Admin save
-- `param.set()` call
-- Import via `load_param`
+- `param.set()` call (after `auto_cast` if enabled)
+- Import via `dap_load`
 
 ### Add validator?
 ```python
@@ -308,6 +305,10 @@ Validators run automatically on save. Invalid values rejected.
 ```python
 param = Parameter.objects.get(slug="SITE_TITLE")
 param.set("New Title")  # Type-safe, validates, saves
+
+# With auto_cast for string input to typed parameter:
+param = Parameter.objects.get(slug="MAX_SIZE")  # INT type
+param.set("1024", auto_cast=True)  # Converts "1024" to int
 ```
 
 ### Delete parameter?

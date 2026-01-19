@@ -18,35 +18,23 @@ timeout = app_parameter.TIMEOUT         # → timedelta
 
 Pros: Concise, auto-conversion. Cons: Raises exception if missing.
 
-### Manager (Explicit)
+### Direct Access
 
 ```python
 from django_app_parameter.models import Parameter
 
-# Basic types
-title = Parameter.objects.str("BLOG_TITLE")
-year = Parameter.objects.int("BIRTH_YEAR")
-rate = Parameter.objects.decimal("TAX_RATE")
-enabled = Parameter.objects.bool("FEATURE_FLAG")
+# Get parameter object and retrieve typed value
+param = Parameter.objects.get(slug="BLOG_TITLE")
+title = param.get()  # Returns str
 
-# Date/time types
-launch = Parameter.objects.date("LAUNCH_DATE")
-event = Parameter.objects.datetime("EVENT_DATETIME")
-opening = Parameter.objects.time("OPENING_TIME")
-timeout = Parameter.objects.duration("TIMEOUT")
+param = Parameter.objects.get(slug="BIRTH_YEAR")
+year = param.get()  # Returns int
 
-# Validated types
-site_url = Parameter.objects.url("SITE_URL")
-contact = Parameter.objects.email("CONTACT_EMAIL")
-discount = Parameter.objects.percentage("DISCOUNT")
-
-# Structured types
-tags = Parameter.objects.list("TAGS")
-settings = Parameter.objects.dict("SETTINGS")
-log_path = Parameter.objects.path("LOG_PATH")
+param = Parameter.objects.get(slug="TAX_RATE")
+rate = param.get()  # Returns Decimal
 ```
 
-Pros: Explicit types, better IDE support.
+Pros: Full access to parameter object for modifications.
 
 ### Parameter Object
 
@@ -68,7 +56,7 @@ value = param.get()       # Auto-converted
 Parameter.objects.create(
     name="Site Title",
     value="My Site",
-    value_type=Parameter.TYPES.STR
+    value_type=TYPES.STR
 )
 title = app_parameter.SITE_TITLE  # "My Site"
 ```
@@ -78,7 +66,7 @@ title = app_parameter.SITE_TITLE  # "My Site"
 Parameter.objects.create(
     name="Max Upload Size",
     value="5242880",
-    value_type=Parameter.TYPES.INT
+    value_type=TYPES.INT
 )
 max_size = app_parameter.MAX_UPLOAD_SIZE  # 5242880
 ```
@@ -88,7 +76,7 @@ max_size = app_parameter.MAX_UPLOAD_SIZE  # 5242880
 Parameter.objects.create(
     name="PI Value",
     value="3.14159",
-    value_type=Parameter.TYPES.FLT
+    value_type=TYPES.FLT
 )
 pi = app_parameter.PI_VALUE  # 3.14159
 ```
@@ -102,7 +90,7 @@ from decimal import Decimal
 Parameter.objects.create(
     name="Tax Rate",
     value="20.00",
-    value_type=Parameter.TYPES.DCL
+    value_type=TYPES.DCL
 )
 tax_rate = app_parameter.TAX_RATE  # Decimal('20.00')
 ```
@@ -112,7 +100,7 @@ tax_rate = app_parameter.TAX_RATE  # Decimal('20.00')
 Parameter.objects.create(
     name="Maintenance Mode",
     value="false",
-    value_type=Parameter.TYPES.BOO
+    value_type=TYPES.BOO
 )
 if app_parameter.MAINTENANCE_MODE:
     return HttpResponse("Under maintenance")
@@ -127,7 +115,7 @@ from datetime import date
 Parameter.objects.create(
     name="Launch Date",
     value="2024-12-31",
-    value_type=Parameter.TYPES.DATE
+    value_type=TYPES.DATE
 )
 launch = app_parameter.LAUNCH_DATE  # date(2024, 12, 31)
 ```
@@ -141,7 +129,7 @@ from datetime import datetime
 Parameter.objects.create(
     name="Event Start",
     value="2024-12-31T23:59:59",
-    value_type=Parameter.TYPES.DATETIME
+    value_type=TYPES.DATETIME
 )
 event = app_parameter.EVENT_START  # datetime(2024, 12, 31, 23, 59, 59)
 ```
@@ -155,7 +143,7 @@ from datetime import time
 Parameter.objects.create(
     name="Opening Time",
     value="09:00:00",
-    value_type=Parameter.TYPES.TIME
+    value_type=TYPES.TIME
 )
 opening = app_parameter.OPENING_TIME  # time(9, 0, 0)
 ```
@@ -169,7 +157,7 @@ from datetime import timedelta
 Parameter.objects.create(
     name="Session Timeout",
     value="3600",  # seconds
-    value_type=Parameter.TYPES.DURATION
+    value_type=TYPES.DURATION
 )
 timeout = app_parameter.SESSION_TIMEOUT  # timedelta(seconds=3600)
 ```
@@ -181,7 +169,7 @@ Stored as seconds, returned as `timedelta`.
 Parameter.objects.create(
     name="API Endpoint",
     value="https://api.example.com",
-    value_type=Parameter.TYPES.URL
+    value_type=TYPES.URL
 )
 api_url = app_parameter.API_ENDPOINT  # "https://api.example.com"
 ```
@@ -193,7 +181,7 @@ Validates URL format. Raises `ValueError` if invalid.
 Parameter.objects.create(
     name="Contact Email",
     value="contact@example.com",
-    value_type=Parameter.TYPES.EMAIL
+    value_type=TYPES.EMAIL
 )
 email = app_parameter.CONTACT_EMAIL  # "contact@example.com"
 ```
@@ -205,7 +193,7 @@ Validates email format. Raises `ValueError` if invalid.
 Parameter.objects.create(
     name="Discount",
     value="15.5",
-    value_type=Parameter.TYPES.PERCENTAGE
+    value_type=TYPES.PERCENTAGE
 )
 discount = app_parameter.DISCOUNT  # 15.5
 ```
@@ -217,7 +205,7 @@ Validates 0-100 range. Raises `ValueError` if out of range.
 Parameter.objects.create(
     name="Allowed Tags",
     value="python, django, web",
-    value_type=Parameter.TYPES.LIST
+    value_type=TYPES.LIST
 )
 tags = app_parameter.ALLOWED_TAGS  # ["python", "django", "web"]
 ```
@@ -229,7 +217,7 @@ Splits by comma, strips whitespace.
 Parameter.objects.create(
     name="API Settings",
     value='{"host": "api.example.com", "port": 443}',
-    value_type=Parameter.TYPES.DICT
+    value_type=TYPES.DICT
 )
 settings = app_parameter.API_SETTINGS  # {"host": "api.example.com", "port": 443}
 ```
@@ -241,7 +229,7 @@ Must be valid JSON object. Raises `ValueError` if not dict.
 Parameter.objects.create(
     name="Feature Flags",
     value='["feature1", "feature2"]',
-    value_type=Parameter.TYPES.JSN
+    value_type=TYPES.JSN
 )
 flags = app_parameter.FEATURE_FLAGS  # ["feature1", "feature2"]
 ```
@@ -255,7 +243,7 @@ from pathlib import Path
 Parameter.objects.create(
     name="Log Directory",
     value="/var/log/myapp",
-    value_type=Parameter.TYPES.PATH
+    value_type=TYPES.PATH
 )
 log_dir = app_parameter.LOG_DIRECTORY  # Path("/var/log/myapp")
 ```
@@ -273,16 +261,22 @@ param.set(Decimal("19.6"))  # Type-safe, validates, saves
 
 Validators run automatically before saving.
 
-### Direct Setters
+### Using `auto_cast`
+
+When you have a string value (e.g., from user input) and want to convert it to the parameter's native type:
 
 ```python
-param.set_int(42)
-param.set_str("new value")
-param.set_date(date(2024, 12, 31))
-param.set_list(["a", "b", "c"])
+param = Parameter.objects.get(slug="TAX_RATE")
+param.set("19.6", auto_cast=True)  # Converts "19.6" to Decimal, validates, saves
+
+param = Parameter.objects.get(slug="MAX_SIZE")
+param.set("1024", auto_cast=True)  # Converts "1024" to int, validates, saves
+
+param = Parameter.objects.get(slug="LAUNCH_DATE")
+param.set("2024-12-31", auto_cast=True)  # Converts to date, validates, saves
 ```
 
-Type-safe: raises `TypeError` if wrong type.
+This saves you from manually converting types before calling `set()`.
 
 ### In Admin
 

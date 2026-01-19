@@ -55,10 +55,11 @@ from django_app_parameter import app_parameter
 title = app_parameter.BLOG_TITLE  # Auto-converted
 ```
 
-**Manager:**
+**Direct:**
 ```python
 from django_app_parameter.models import Parameter
-title = Parameter.objects.str("BLOG_TITLE")
+param = Parameter.objects.get(slug="BLOG_TITLE")
+title = param.get()  # Auto-converted to proper type
 ```
 
 **Templates:**
@@ -122,9 +123,12 @@ Modify parameters with type-safe setters:
 ```python
 param = Parameter.objects.get(slug="TAX_RATE")
 param.set(Decimal("19.6"))  # Validates + saves
+
+# Or with auto_cast to convert from string:
+param.set("19.6", auto_cast=True)  # Converts string to Decimal, validates + saves
 ```
 
-Validators run automatically on `set()`.
+Validators run automatically on `set()`. The `auto_cast` parameter converts string input to the parameter's native type before validation.
 
 ## Use Cases
 
@@ -165,14 +169,14 @@ DJANGO_APP_PARAMETER = {
 # Enable encryption for a parameter
 param = Parameter.objects.create(
     name="API Secret",
-    value_type=Parameter.TYPES.STR,
+    value_type=TYPES.STR,
     value="initial_value",
     enable_cypher=True  # Enable encryption
 )
 
 # Set/get works transparently
-param.set_str("secret_api_key")
-value = param.str()  # Automatically decrypted
+param.set("secret_api_key")  # Automatically encrypted
+value = param.get()  # Automatically decrypted
 ```
 
 ### Notes

@@ -66,20 +66,16 @@ git push origin fix/description-bug
 ### Accès aux paramètres
 
 ```python
-# 1. Via proxy (recommandé)
+# 1. Via proxy (recommandé pour lecture seule)
 from django_app_parameter import app_parameter
 title = app_parameter.BLOG_TITLE  # Auto-converti
 
-# 2. Via Manager
+# 2. Objet direct (pour lecture et modification)
 from django_app_parameter.models import Parameter
-title = Parameter.objects.str("BLOG_TITLE")
-year = Parameter.objects.int("BIRTH_YEAR")
-
-# 3. Objet direct
 param = Parameter.objects.get(slug="BLOG_TITLE")
 value = param.get()  # Auto-conversion
 
-# 4. Template (globaux uniquement)
+# 3. Template (globaux uniquement)
 # {{ BLOG_TITLE }}
 ```
 
@@ -91,14 +87,14 @@ from django_app_parameter.models import Parameter
 # Simple
 param = Parameter.objects.create(
     name="Blog Title",
-    value_type=Parameter.TYPES.STR,
+    value_type=TYPES.STR,
     value="My Awesome Blog"
 )
 
 # Avec description et global
 param = Parameter.objects.create(
     name="Max Upload Size",
-    value_type=Parameter.TYPES.INT,
+    value_type=TYPES.INT,
     value="10485760",  # 10 MB
     description="Maximum file upload size in bytes",
     is_global=False
@@ -107,7 +103,7 @@ param = Parameter.objects.create(
 # Avec validateurs
 param = Parameter.objects.create(
     name="Age",
-    value_type=Parameter.TYPES.INT,
+    value_type=TYPES.INT,
     value="25"
 )
 param.parametervalidator_set.create(
@@ -123,15 +119,14 @@ param.parametervalidator_set.create(
 ### Modifier un paramètre
 
 ```python
-# Via setter typé (recommandé - avec validation)
-param.set_int(42)
-param.set_str("new value")
-param.set_bool(True)
+# Via set() (recommandé - avec validation)
+param = Parameter.objects.get(slug="MAX_SIZE")
+param.set(42)  # Valide le type, lance les validators, sauvegarde
 
-# Via setter générique
-param.set(42)  # Route vers bon setter
+# Via set() avec auto_cast (pour entrées string)
+param.set("42", auto_cast=True)  # Convertit string → int, valide, sauvegarde
 
-# Via assignation directe (sans validation)
+# Via assignation directe (sans validation - déconseillé)
 param.value = "42"
 param.save()
 ```
@@ -224,54 +219,45 @@ param.save()
 ### Ajouter un nouveau type
 
 ```python
-# 1. Dans models.py - définir le type
+# 1. Dans constants.py - définir le type
 class TYPES(models.TextChoices):
     CUSTOM = "CST", "Custom Type"
 
-# 2. Ajouter dans VALUE_TYPE_CHOICES
-VALUE_TYPE_CHOICES = [
-    # ...
-    (TYPES.CUSTOM, "Custom Type"),
-]
+# 2. Créer la classe proxy dans models.py
+class ParameterCustom(Parameter):
+    """Proxy pour type custom"""
+    type = TYPES.CUSTOM
 
-# 3. Créer getter
-def custom(self) -> CustomType:
-    """Getter pour type custom"""
-    # logique de conversion
-    return converted_value
+    class Meta:
+        proxy = True
 
-# 4. Créer setter
-def set_custom(self, value: CustomType) -> None:
-    """Setter avec validation"""
-    if not isinstance(value, CustomType):
-        raise TypeError(f"Expected CustomType, got {type(value)}")
-    self.value = _str(value)
-    self._run_validators()
-    self.save()
+    def _cast_from_str(self, value: _str) -> CustomType:
+        """Convertit string → CustomType"""
+        return CustomType(value)
 
-# 5. Mettre à jour get() et set()
-def get(self) -> ParameterReturnType:
-    functions = {
-        # ...
-        self.TYPES.CUSTOM: "custom",
-    }
-    # ...
+    def _cast_to_str(self, value: CustomType) -> _str:
+        """Convertit CustomType → string"""
+        return _str(value)
 
-# 6. Ajouter méthode Manager
-def custom(self, slug: str) -> CustomType:
-    return self.get_from_slug(slug).custom()
+    def _is_instance(self, value: Any) -> bool:
+        """Vérifie si value est du bon type"""
+        return isinstance(value, CustomType)
 
-# 7. Migration
-# cd demo_project && poetry run python manage.py makemigrations
+# 3. Enregistrer dans managers.py (get_proxy_class)
+TYPES.CUSTOM: ParameterCustom,
 
-# 8. Tests
+# 4. Migration
+# poetry run python manage.py makemigrations django_app_parameter
+
+# 5. Tests
 def test_custom_type(db):
     param = Parameter.objects.create(
         name="Test Custom",
-        value_type=Parameter.TYPES.CUSTOM,
+        value_type=TYPES.CUSTOM,
         value="custom_value"
     )
-    assert param.custom() == expected_result
+    assert param.get() == expected_result
+    param.set(new_custom_value)  # Utilise _is_instance pour validation
 ```
 
 ### Ajouter un validateur personnalisé
@@ -307,12 +293,12 @@ def test_feature(db):
     # Arrange
     param = Parameter.objects.create(
         name="Test",
-        value_type=Parameter.TYPES.INT,
+        value_type=TYPES.INT,
         value="42"
     )
 
     # Act
-    result = param.int()
+    result = param.get()
 
     # Assert
     assert result == 42
@@ -331,7 +317,7 @@ ImproperlyConfigured: Parameter 'MY_PARAM' does not exist
 # 2. Créer le paramètre:
 Parameter.objects.create(
     name="My Param",
-    value_type=Parameter.TYPES.STR,
+    value_type=TYPES.STR,
     value="default"
 )
 ```
