@@ -10,6 +10,7 @@ from django.core.management import call_command
 
 from django_app_parameter import app_parameter
 from django_app_parameter.context_processors import add_global_parameter_context
+from django_app_parameter.managers import get_proxy_class
 from django_app_parameter.models import (
     TYPES,
     Parameter,
@@ -127,15 +128,29 @@ class TestParameter:
         assert isinstance(result, expected_type)
         assert result == expected_value
 
-    def json(self):
+    def test_json(self):
         param = ParameterJson(
             name="testing",
             slug="TESTING",
-            value="{'hello': ['world', 'testers']}",
+            value='{"hello": ["world", "testers"]}',
         )
         result = param.get()
         assert isinstance(result, dict)
         assert result["hello"][1] == "testers"
+
+    def test_json_is_instance_not_serializable(self):
+        param = ParameterJson(name="testing")
+        assert not param._is_instance(
+            {"hello": ["world", datetime(2024, 6, 1, 12, 0, 0)]}
+        )
+
+    def test_url_is_instance_not_serializable(self):
+        param = ParameterUrl(name="testing")
+        assert not param._is_instance("blablabl")
+
+    def test_email_is_instance_not_serializable(self):
+        param = ParameterEmail(name="testing")
+        assert not param._is_instance("blablabl")
 
     def test_dundo_str(self):
         param = Parameter(
@@ -433,6 +448,34 @@ class TestParameter:
 class TestParameterManager:
     def test_fixtures(self, params):
         assert Parameter.objects.all().count() == 3
+
+    @pytest.mark.parametrize(
+        "type,expected_class",
+        [
+            (TYPES.INT, ParameterInt),
+            (TYPES.STR, ParameterStr),
+            (TYPES.FLT, ParameterFloat),
+            (TYPES.DCL, ParameterDecimal),
+            (TYPES.JSN, ParameterJson),
+            (TYPES.BOO, ParameterBool),
+            (TYPES.DATE, ParameterDate),
+            (TYPES.DATETIME, ParameterDatetime),
+            (TYPES.TIME, ParameterTime),
+            (TYPES.URL, ParameterUrl),
+            (TYPES.EMAIL, ParameterEmail),
+            (TYPES.LIST, ParameterList),
+            (TYPES.DICT, ParameterDict),
+            (TYPES.PATH, ParameterPath),
+            (TYPES.DURATION, ParameterDuration),
+            (TYPES.PERCENTAGE, ParameterPercentage),
+        ]
+    )
+    def test_get_proxy_class(self, type, expected_class):
+        assert get_proxy_class(type) == expected_class
+
+    def test_get_proxy_class_not_existing(self):
+        with pytest.raises(ImproperlyConfigured):
+            get_proxy_class("non_existing_type")
 
     @pytest.mark.parametrize(
         "type,expected_class,value,expected_value",
@@ -945,6 +988,40 @@ class TestParameterSetters:
         )
         # get correct proxy instance
         param.set(value_in)
+        param.refresh_from_db()
+        assert param.value == expected_value
+
+    @pytest.mark.parametrize(
+        "type,value_in,expected_value",
+        [
+            (TYPES.STR, "hello", "hello"),
+            (TYPES.INT, 42, "42"),
+            (TYPES.FLT, 3.14, "3.14"),
+            (TYPES.DCL, Decimal("2.71"), "2.71"),
+            (TYPES.JSN, {"key": "value"}, '{"key": "value"}'),
+            (TYPES.BOO, True, "1"),
+            (TYPES.BOO, False, "0"),
+            (TYPES.DATE, date(2024, 1, 15), "2024-01-15"),
+            (TYPES.DATETIME, datetime(2024, 1, 15, 10, 30, 0), "2024-01-15T10:30:00"),
+            (TYPES.TIME, time(14, 30, 0), "14:30:00"),
+            (TYPES.URL, "https://example.com", "https://example.com"),
+            (TYPES.EMAIL, "test@example.com", "test@example.com"),
+            (TYPES.LIST, ["a", "b", "c"], "a,b,c"),
+            (TYPES.LIST, [], ""),
+            (TYPES.DICT, {"key": "value"}, '{"key": "value"}'),
+            (TYPES.PATH, Path("/path/to/file"), "/path/to/file"),
+            (TYPES.DURATION, timedelta(seconds=3600), "3600.0"),
+            (TYPES.PERCENTAGE, 75.5, "75.5"),
+        ],
+    )
+    def test_set_auto_cast(self, type, value_in, expected_value):
+        param = Parameter.objects.create(
+            name="test",
+            value="0",
+            value_type=type,
+        )
+        # get correct proxy instance
+        param.set(expected_value, auto_cast=True)
         param.refresh_from_db()
         assert param.value == expected_value
 
