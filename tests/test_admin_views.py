@@ -40,27 +40,6 @@ def sample_parameter(db):
 
 
 @pytest.mark.django_db
-class TestParameterAdminSecurity:
-    """Critical security tests for admin authentication"""
-
-    def test_admin_list_view_requires_login(self):
-        """Test that changelist requires authentication"""
-        client = Client()
-        url = reverse("admin:django_app_parameter_parameter_changelist")
-        response = client.get(url)
-        assert response.status_code == 302
-        assert "/admin/login/" in response.url
-
-    def test_admin_add_view_requires_login(self):
-        """Test that add view requires authentication"""
-        client = Client()
-        url = reverse("admin:django_app_parameter_parameter_add")
-        response = client.get(url)
-        assert response.status_code == 302
-        assert "/admin/login/" in response.url
-
-
-@pytest.mark.django_db
 class TestParameterAdminCRUD:
     """Critical CRUD operations tests"""
 

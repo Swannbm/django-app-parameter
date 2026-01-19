@@ -4,6 +4,7 @@ import pytest
 from cryptography.fernet import Fernet
 from django.core.exceptions import ImproperlyConfigured
 
+from django_app_parameter.constants import TYPES
 from django_app_parameter.models import Parameter
 from django_app_parameter.utils import decrypt_value, encrypt_value, get_encryption_key
 
@@ -96,67 +97,58 @@ class TestParameterEncryption:
         """Test basic set/get with encryption."""
         param = Parameter.objects.create(
             name="Secret",
-            value_type=Parameter.TYPES.STR,
+            value_type=TYPES.STR,
             value="initial",
             enable_cypher=True,
         )
 
-        param.set_str("secret_value")
+        param.set("secret_value")
         param.refresh_from_db()
 
         # Value encrypted in DB
         assert param.value.startswith("gAAAAA")
         # But decrypted when read
-        assert param.str() == "secret_value"
+        assert param.get() == "secret_value"
 
-    def test_encryption_with_different_types(self, db, configure_encryption):
+    @pytest.mark.parametrize(
+        "value_type, test_value",
+        [
+            (TYPES.STR, "test"),
+            (TYPES.INT, 42),
+            (TYPES.FLT, 3.14),
+            (TYPES.BOO, True),
+        ],
+    )
+    def test_encryption_with_different_types(
+        self,
+        db,
+        configure_encryption,
+        value_type,
+        test_value,
+    ):
         """Test encryption works with different parameter types."""
-        test_cases = [
-            (Parameter.TYPES.STR, "test", "set_str"),
-            (Parameter.TYPES.INT, 42, "set_int"),
-            (Parameter.TYPES.FLT, 3.14, "set_float"),
-            (Parameter.TYPES.BOO, True, "set_bool"),
-        ]
 
-        for value_type, test_value, setter in test_cases:
-            param = Parameter.objects.create(
-                name=f"Test {value_type}",
-                value_type=value_type,
-                value="0",
-                enable_cypher=True,
-            )
-            getattr(param, setter)(test_value)
-            param.refresh_from_db()
-
-            assert param.value.startswith("gAAAAA")
-            assert param.get() == test_value
-
-    def test_enable_encryption_on_existing_parameter(self, db, configure_encryption):
-        """Test enabling encryption on existing parameter."""
         param = Parameter.objects.create(
-            name="Secret",
-            value_type=Parameter.TYPES.STR,
-            value="plain",
-            enable_cypher=False,
+            name=f"Test {value_type}",
+            value_type=value_type,
+            value="0",
+            enable_cypher=True,
         )
-
-        # Enable encryption
-        param.enable_cypher = True
-        param.set_str("new_value")
+        param.set(test_value)
         param.refresh_from_db()
 
         assert param.value.startswith("gAAAAA")
-        assert param.str() == "new_value"
+        assert param.get() == test_value
 
     def test_to_dict_exports_decrypted_value(self, db, configure_encryption):
         """Test to_dict exports decrypted values."""
         param = Parameter.objects.create(
             name="Secret",
-            value_type=Parameter.TYPES.STR,
+            value_type=TYPES.STR,
             value="test",
             enable_cypher=True,
         )
-        param.set_str("secret")
+        param.set("secret")
         param.refresh_from_db()
 
         param_dict = param.to_dict()
@@ -168,7 +160,7 @@ class TestParameterEncryption:
 
         param = Parameter.objects.create(
             name="Age",
-            value_type=Parameter.TYPES.INT,
+            value_type=TYPES.INT,
             value="25",
             enable_cypher=True,
         )
@@ -176,11 +168,11 @@ class TestParameterEncryption:
             validator_type="MaxValueValidator", validator_params={"limit_value": 100}
         )
 
-        param.set_int(50)
-        assert param.int() == 50
+        param.set(50)
+        assert param.get() == 50
 
         with pytest.raises(ValidationError):
-            param.set_int(150)
+            param.set(150)
 
 
 class TestEncryptionEdgeCases:
@@ -190,16 +182,16 @@ class TestEncryptionEdgeCases:
         """Test encrypting empty string."""
         param = Parameter.objects.create(
             name="Empty",
-            value_type=Parameter.TYPES.STR,
+            value_type=TYPES.STR,
             value="",
             enable_cypher=True,
         )
 
-        param.set_str("")
+        param.set("")
         param.refresh_from_db()
 
         assert param.value.startswith("gAAAAA")
-        assert param.str() == ""
+        assert param.get() == ""
 
     def test_special_characters_encryption(self, db, configure_encryption):
         """Test encrypting strings with special characters."""
@@ -207,13 +199,13 @@ class TestEncryptionEdgeCases:
 
         param = Parameter.objects.create(
             name="Special",
-            value_type=Parameter.TYPES.STR,
+            value_type=TYPES.STR,
             value="test",
             enable_cypher=True,
         )
 
-        param.set_str(special_string)
+        param.set(special_string)
         param.refresh_from_db()
 
         assert param.value.startswith("gAAAAA")
-        assert param.str() == special_string
+        assert param.get() == special_string

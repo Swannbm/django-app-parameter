@@ -5,7 +5,7 @@ import json
 import pytest
 from django.core.management import call_command
 
-from django_app_parameter.models import Parameter
+from django_app_parameter.models import TYPES, Parameter
 
 
 @pytest.mark.django_db
@@ -182,7 +182,7 @@ class TestVersionCompatibility:
             name="Test Param",
             slug="TEST_PARAM",
             value="test_value",
-            value_type=Parameter.TYPES.STR,
+            value_type=TYPES.STR,
             description="Test parameter",
             is_global=True,
             enable_cypher=False,
@@ -332,5 +332,5 @@ class TestVersionCompatibility:
         assert param.enable_history is False
 
         # Modify value - should not create history
-        param.set_str("new_value")
+        param.set("new_value")
         assert param.history.count() == 0  # type: ignore[attr-defined]

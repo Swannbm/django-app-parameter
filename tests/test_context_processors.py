@@ -4,6 +4,7 @@ import pytest
 from django.http import HttpRequest
 from django.test import RequestFactory
 
+from django_app_parameter.constants import TYPES
 from django_app_parameter.context_processors import add_global_parameter_context
 from django_app_parameter.models import Parameter
 
@@ -51,7 +52,7 @@ class TestContextProcessors:
             name="string param",
             slug="STRING_PARAM",
             value="hello world",
-            value_type=Parameter.TYPES.STR,
+            value_type=TYPES.STR,
             is_global=True,
         )
         context = add_global_parameter_context(dummy_request)
@@ -66,7 +67,7 @@ class TestContextProcessors:
             name="int param",
             slug="INT_PARAM",
             value="42",
-            value_type=Parameter.TYPES.INT,
+            value_type=TYPES.INT,
             is_global=True,
         )
         context = add_global_parameter_context(dummy_request)
@@ -81,7 +82,7 @@ class TestContextProcessors:
             name="bool param",
             slug="BOOL_PARAM",
             value="True",
-            value_type=Parameter.TYPES.BOO,
+            value_type=TYPES.BOO,
             is_global=True,
         )
         context = add_global_parameter_context(dummy_request)
@@ -96,7 +97,7 @@ class TestContextProcessors:
             name="bool param",
             slug="BOOL_PARAM_FALSE",
             value="False",
-            value_type=Parameter.TYPES.BOO,
+            value_type=TYPES.BOO,
             is_global=True,
         )
         context = add_global_parameter_context(dummy_request)
@@ -127,7 +128,7 @@ class TestContextProcessors:
                     name="another global",
                     slug="ANOTHER_GLOBAL",
                     value="123",
-                    value_type=Parameter.TYPES.INT,
+                    value_type=TYPES.INT,
                     is_global=True,
                 ),
             ]
