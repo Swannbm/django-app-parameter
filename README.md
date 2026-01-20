@@ -1,7 +1,7 @@
 # Django-app-parameter
 
-![Python](https://img.shields.io/badge/python-3.10%20|%203.11%20|%203.12%20|%203.13-yellow)
-![Django](https://img.shields.io/badge/django-4.2%20LTS%20|%205.2%20LTS-green)
+![Python](https://img.shields.io/badge/python-3.10%20|%203.11%20|%203.12%20|%203.13%20|%203.14-yellow)
+![Django](https://img.shields.io/badge/django-4.2%20LTS%20|%205.2%20LTS%20|%206.0-green)
 ![coverage](https://img.shields.io/badge/coverage-100%25-green)
 ![version](https://img.shields.io/badge/version-3.0.0-blue)
 ![ruff](https://img.shields.io/badge/code%20style-ruff-000000)
@@ -51,7 +51,17 @@ For encryption support (optional):
 pip install django-app-parameter[cryptography]
 ```
 
-**Requirements:** Python 3.10+ • Django 4.2+ LTS
+**Requirements:** Python 3.10+ • Django 4.2+
+
+### Compatibility Matrix
+
+| Python | Django 4.2 LTS | Django 5.2 LTS | Django 6.0 |
+|--------|----------------|----------------|------------|
+| 3.10   | ✅ | ✅ | ❌ |
+| 3.11   | ✅ | ✅ | ❌ |
+| 3.12   | ✅ | ✅ | ✅ |
+| 3.13   | ✅ | ✅ | ✅ |
+| 3.14   | ❌ | ✅ | ✅ |
 
 ### Configuration
 

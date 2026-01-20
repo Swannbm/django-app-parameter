@@ -14,13 +14,32 @@ keywords = [
     "Parameter",
     "Configuration",
 ]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Web Environment",
+    "Framework :: Django",
+    "Framework :: Django :: 4.2",
+    "Framework :: Django :: 5.2",
+    "Framework :: Django :: 6.0",
+    "Intended Audience :: Developers",
+    "License :: CC0 1.0 Universal (CC0 1.0) Public Domain Dedication",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
 
 [tool.poetry.urls]
 "Bug Tracker" = "https://github.com/Swannbm/django-app-parameter/issues"
 
 [tool.poetry.dependencies]
 python = "^3.10"
-Django = ">=4.2,<6.0"
+Django = ">=4.2,<7.0"
 
 [tool.poetry.extras]
 cryptography = ["cryptography"]

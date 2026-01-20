@@ -4,6 +4,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [3.0.0] - 2026.01.20
 
+### Added
+* **Python 3.14** compatibility
+* **Django 6** compatibility
+
 ### Changed
 * **Breaking:** Simplified API - replaced type-specific methods with unified `get()` and `set()`:
   * `param.int()`, `param.str()`, `param.bool()`, etc. → `param.get()`

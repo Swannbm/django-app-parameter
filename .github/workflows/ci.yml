@@ -11,8 +11,17 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ['3.10', '3.11', '3.12', '3.13']
-        django-version: ['4.2', '5.1']
+        python-version: ['3.10', '3.11', '3.12', '3.13', '3.14']
+        django-version: ['4.2', '5.2', '6.0']
+        exclude:
+          # Django 4.2 doesn't support Python 3.14
+          - python-version: '3.14'
+            django-version: '4.2'
+          # Django 6.0 requires Python 3.12+
+          - python-version: '3.10'
+            django-version: '6.0'
+          - python-version: '3.11'
+            django-version: '6.0'
 
     steps:
       - uses: actions/checkout@v4
@@ -59,7 +68,7 @@ jobs:
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
-        if: matrix.python-version == '3.12' && matrix.django-version == '5.1'
+        if: matrix.python-version == '3.12' && matrix.django-version == '5.2'
         with:
           file: ./coverage.xml
           fail_ci_if_error: false

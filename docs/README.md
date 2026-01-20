@@ -200,7 +200,7 @@ Use env vars for secrets (API keys, passwords), app_parameter for business param
 More features vs. Simpler. Use constance for advanced needs, app_parameter for simplicity.
 
 ## Limits
-
+pyth
 1. **250 char limit** (or ~190 chars for encrypted values)
 2. **DB query per access** (consider caching)
 3. **Encryption available** (see [Encryption](../README.md#encryption) in main README)
