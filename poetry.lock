@@ -1538,4 +1538,4 @@ cryptography = []
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.10"
-content-hash = "8e5faa8b62f6b1352beeaa351444c28a1815b3a6f65b1678855e25f1d180fac2"
+content-hash = "df3aab280caf63df5456e8874fc54123cd5f0e5e699edc873632baf3cc4fb053"
