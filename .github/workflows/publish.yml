@@ -53,7 +53,7 @@ jobs:
         run: poetry install --no-interaction
 
       - name: Install Django ${{ matrix.django-version }}
-        run: poetry add Django@^${{ matrix.django-version }} --no-interaction
+        run: poetry run pip install "Django~=${{ matrix.django-version }}.0"
 
       - name: Run ruff
         run: poetry run ruff check .
