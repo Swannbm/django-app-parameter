@@ -1,14 +1,39 @@
 # Django-app-parameter
 
-![Python](https://img.shields.io/badge/python-3.10%20|%203.11%20|%203.12%20|%203.13-yellow)
-![Django](https://img.shields.io/badge/django-4.2%20LTS%20|%205.2%20LTS-green)
+![Python](https://img.shields.io/badge/python-3.10%20|%203.11%20|%203.12%20|%203.13%20|%203.14-yellow)
+![Django](https://img.shields.io/badge/django-4.2%20LTS%20|%205.2%20LTS%20|%206.0-green)
 ![coverage](https://img.shields.io/badge/coverage-100%25-green)
-![version](https://img.shields.io/badge/version-2.1.2-blue)
+![version](https://img.shields.io/badge/version-3.0.0-blue)
 ![ruff](https://img.shields.io/badge/code%20style-ruff-000000)
 ![pyright](https://img.shields.io/badge/type%20checker-pyright-2A6DB2)
 ![licence](https://img.shields.io/badge/licence-CC0%201.0%20Universal-purple)
 
 Django-app-parameter lets you store application settings in the database and update them at runtime through Django admin - no deployment or restart needed. Perfect for things like site titles, email addresses, feature flags, or any configuration that business users should control.
+
+## ⚠️ Migration from v2.x to v3.0
+
+Version 3.0 introduces a simplified API. Type-specific methods have been replaced with unified `get()` and `set()`:
+
+```python
+# Before (v2.x)
+value = param.int()
+param.set_int(42)
+title = Parameter.objects.str("BLOG_TITLE")
+
+# After (v3.0)
+value = param.get()
+param.set(42)
+param = Parameter.objects.get(slug="BLOG_TITLE")
+title = param.get()
+```
+
+**New feature:** `auto_cast` parameter to convert string input to native type:
+
+```python
+param.set("42", auto_cast=True)  # Converts "42" to int for INT parameters
+```
+
+See [CHANGELOG.md](CHANGELOG.md) for full details.
 
 📚 **[Full Documentation](https://django-app-parameter.readthedocs.io/)**
 
@@ -26,7 +51,17 @@ For encryption support (optional):
 pip install django-app-parameter[cryptography]
 ```
 
-**Requirements:** Python 3.10+ • Django 4.2+ LTS
+**Requirements:** Python 3.10+ • Django 4.2+
+
+### Compatibility Matrix
+
+| Python | Django 4.2 LTS | Django 5.2 LTS | Django 6.0 |
+|--------|----------------|----------------|------------|
+| 3.10   | ✅ | ✅ | ❌ |
+| 3.11   | ✅ | ✅ | ❌ |
+| 3.12   | ✅ | ✅ | ✅ |
+| 3.13   | ✅ | ✅ | ✅ |
+| 3.14   | ❌ | ✅ | ✅ |
 
 ### Configuration
 

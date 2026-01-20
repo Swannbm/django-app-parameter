@@ -2,6 +2,7 @@
 
 import pytest
 
+from django_app_parameter.constants import TYPES
 from django_app_parameter.models import Parameter
 
 
@@ -13,7 +14,7 @@ class TestParameterHistory:
         """Test that history is disabled by default"""
         param = Parameter.objects.create(
             name="Test Param",
-            value_type=Parameter.TYPES.STR,
+            value_type=TYPES.STR,
             value="initial",
         )
         assert param.enable_history is False
@@ -22,13 +23,13 @@ class TestParameterHistory:
         """Test that history is not saved when enable_history=False"""
         param = Parameter.objects.create(
             name="Test Param",
-            value_type=Parameter.TYPES.STR,
+            value_type=TYPES.STR,
             value="initial",
             enable_history=False,
         )
 
         # Modify the value
-        param.set_str("updated")
+        param.set("updated")
 
         # Check no history was created
         assert param.history.count() == 0
@@ -37,13 +38,13 @@ class TestParameterHistory:
         """Test that history is saved when enable_history=True"""
         param = Parameter.objects.create(
             name="Test Param",
-            value_type=Parameter.TYPES.STR,
+            value_type=TYPES.STR,
             value="initial",
             enable_history=True,
         )
 
         # Modify the value
-        param.set_str("updated")
+        param.set("updated")
 
         # Check history was created
         assert param.history.count() == 1
@@ -55,13 +56,13 @@ class TestParameterHistory:
         """Test that history is not saved if value doesn't change"""
         param = Parameter.objects.create(
             name="Test Param",
-            value_type=Parameter.TYPES.STR,
+            value_type=TYPES.STR,
             value="same",
             enable_history=True,
         )
 
         # Set the same value
-        param.set_str("same")
+        param.set("same")
 
         # Check no history was created (value didn't change)
         assert param.history.count() == 0
@@ -70,14 +71,14 @@ class TestParameterHistory:
         """Test that multiple changes create multiple history entries"""
         param = Parameter.objects.create(
             name="Test Param",
-            value_type=Parameter.TYPES.STR,
+            value_type=TYPES.STR,
             value="v1",
             enable_history=True,
         )
 
-        param.set_str("v2")
-        param.set_str("v3")
-        param.set_str("v4")
+        param.set("v2")
+        param.set("v3")
+        param.set("v4")
 
         # Check 3 history entries (v1, v2, v3)
         assert param.history.count() == 3
@@ -89,13 +90,13 @@ class TestParameterHistory:
         """Test history tracking with integer parameter"""
         param = Parameter.objects.create(
             name="Count",
-            value_type=Parameter.TYPES.INT,
+            value_type=TYPES.INT,
             value="10",
             enable_history=True,
         )
 
-        param.set_int(20)
-        param.set_int(30)
+        param.set(20)
+        param.set(30)
 
         assert param.history.count() == 2
         history_values = list(param.history.values_list("value", flat=True))
@@ -105,12 +106,12 @@ class TestParameterHistory:
         """Test ParameterHistory __str__ method"""
         param = Parameter.objects.create(
             name="Test",
-            value_type=Parameter.TYPES.STR,
+            value_type=TYPES.STR,
             value="initial",
             enable_history=True,
         )
 
-        param.set_str("updated")
+        param.set("updated")
 
         history = param.history.first()
         str_repr = str(history)
@@ -122,13 +123,13 @@ class TestParameterHistory:
         """Test that history is ordered by modified_at descending"""
         param = Parameter.objects.create(
             name="Test",
-            value_type=Parameter.TYPES.STR,
+            value_type=TYPES.STR,
             value="v1",
             enable_history=True,
         )
 
-        param.set_str("v2")
-        param.set_str("v3")
+        param.set("v2")
+        param.set("v3")
 
         history_list = list(param.history.all())
         # First should be most recent (v2 -> v3)
@@ -139,7 +140,7 @@ class TestParameterHistory:
         """Test that from_dict preserves enable_history setting"""
         param = Parameter.objects.create(
             name="Test",
-            value_type=Parameter.TYPES.STR,
+            value_type=TYPES.STR,
             value="v1",
         )
 
@@ -161,7 +162,7 @@ class TestParameterHistory:
         """Test that to_dict includes enable_history field"""
         param = Parameter.objects.create(
             name="Test",
-            value_type=Parameter.TYPES.STR,
+            value_type=TYPES.STR,
             value="v1",
             enable_history=True,
         )
@@ -174,13 +175,13 @@ class TestParameterHistory:
         """Test that to_dict does NOT export history entries"""
         param = Parameter.objects.create(
             name="Test",
-            value_type=Parameter.TYPES.STR,
+            value_type=TYPES.STR,
             value="v1",
             enable_history=True,
         )
 
-        param.set_str("v2")
-        param.set_str("v3")
+        param.set("v2")
+        param.set("v3")
 
         # Should have history
         assert param.history.count() == 2

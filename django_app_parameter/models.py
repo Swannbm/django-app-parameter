@@ -2,19 +2,26 @@ from __future__ import annotations
 
 import json
 import logging
-from collections.abc import Callable
+from collections.abc import Callable, Collection
 from datetime import date as date_type
 from datetime import datetime as datetime_type
 from datetime import time as time_type
 from datetime import timedelta
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, TypedDict, cast
+from typing import Any, cast
 
-from django.core.exceptions import ImproperlyConfigured, ValidationError
+from django.core.exceptions import ValidationError
 from django.core.validators import URLValidator, validate_email
 from django.db import models
 
+from django_app_parameter.constants import TYPES
+from django_app_parameter.managers import (
+    ParameterDict_,
+    ParameterManager,
+    ValidatorDict,
+    get_proxy_class,
+)
 from django_app_parameter.utils import (
     decrypt_value,
     encrypt_value,
@@ -22,33 +29,6 @@ from django_app_parameter.utils import (
     get_validator_from_registry,
     parameter_slugify,
 )
-
-
-class ValidatorDict(TypedDict):
-    """Structure for validator data in JSON export/import"""
-
-    validator_type: str
-    validator_params: dict[str, Any]
-
-
-class _ParameterDictRequired(TypedDict):
-    """Required fields for ParameterDict"""
-
-    name: str
-    slug: str
-    value: str
-    value_type: str
-    description: str
-    is_global: bool
-
-
-class ParameterDict(_ParameterDictRequired, total=False):
-    """Structure for parameter data in JSON export/import"""
-
-    validators: list[ValidatorDict]
-    enable_cypher: bool
-    enable_history: bool
-
 
 logger = logging.getLogger(__name__)
 
@@ -64,137 +44,21 @@ _datetime = datetime_type
 _time = time_type
 
 
-class ParameterManager(models.Manager["Parameter"]):
-    def get_from_slug(self, slug: _str) -> Parameter:
-        """Send ImproperlyConfigured exception if parameter is not in DB"""
-        try:
-            return super().get(slug=slug)
-        except self.model.DoesNotExist as e:
-            raise ImproperlyConfigured(f"{slug} parameters need to be set") from e
-
-    def int(self, slug: _str) -> int:
-        return self.get_from_slug(slug).int()
-
-    def float(self, slug: _str) -> _float:
-        return self.get_from_slug(slug).float()
-
-    def str(self, slug: _str) -> _str:
-        return self.get_from_slug(slug).str()
-
-    def decimal(self, slug: _str) -> Decimal:
-        return self.get_from_slug(slug).decimal()
-
-    def json(self, slug: _str) -> Any:
-        return self.get_from_slug(slug).json()
-
-    def bool(self, slug: _str) -> bool:
-        return self.get_from_slug(slug).bool()
-
-    def date(self, slug: _str) -> date_type:
-        return self.get_from_slug(slug).date()
-
-    def datetime(self, slug: _str) -> datetime_type:
-        return self.get_from_slug(slug).datetime()
-
-    def time(self, slug: _str) -> time_type:
-        return self.get_from_slug(slug).time()
-
-    def url(self, slug: _str) -> _str:
-        return self.get_from_slug(slug).url()
-
-    def email(self, slug: _str) -> _str:
-        return self.get_from_slug(slug).email()
-
-    def list(self, slug: _str) -> _list[_str]:
-        return self.get_from_slug(slug).list()
-
-    def dict(self, slug: _str) -> _dict[_str, Any]:
-        return self.get_from_slug(slug).dict()
-
-    def path(self, slug: _str) -> Path:
-        return self.get_from_slug(slug).path()
-
-    def duration(self, slug: _str) -> timedelta:
-        return self.get_from_slug(slug).duration()
-
-    def percentage(self, slug: _str) -> _float:
-        return self.get_from_slug(slug).percentage()
-
-    def load_from_json(self, data: Any, do_update: _bool = True) -> None:
-        """Load parameters from JSON data.
-
-        Args:
-            data: List of parameter dictionaries
-            do_update: If True, update existing parameters.
-                If False, only create new ones.
-        """
-        logger.info("load json")
-        for param_values in data:
-            # Make a copy to avoid modifying the original data
-            param_dict = cast(ParameterDict, dict(param_values))
-
-            if "slug" in param_dict:
-                slug = param_dict["slug"]
-            else:
-                slug = parameter_slugify(param_dict["name"])
-
-            if do_update:
-                logger.info("Updating parameter %s", slug)
-                # Try to get existing parameter or create new one
-                try:
-                    param = self.get(slug=slug)
-                    param.from_dict(param_dict)
-                except self.model.DoesNotExist:
-                    # Create new parameter
-                    param = self.model()
-                    param.from_dict(param_dict)
-            else:
-                logger.info("Adding parameter %s (no update)", slug)
-                # Only create if doesn't exist
-                try:
-                    param = self.get(slug=slug)
-                    # Already exists, skip
-                except self.model.DoesNotExist:
-                    # Create new parameter
-                    param = self.model()
-                    param.from_dict(param_dict)
-
-    def dump_to_json(self) -> list[ParameterDict]:
-        """Export all parameters to JSON-compatible format.
-
-        Returns:
-            List of parameter dictionaries with all fields and validators
-        """
-        logger.info("Dumping parameters to JSON")
-        result: list[ParameterDict] = []
-
-        for param in self.all():
-            result.append(param.to_dict())
-
-        logger.info("Dumped %d parameters", len(result))
-        return result
+class ParameterValueTypeError(BaseException):
+    """Raised when a parameter value is of incorrect type"""
 
 
 class Parameter(models.Model):
-    objects = ParameterManager()
+    """Base model for application parameters with typed value support.
 
-    class TYPES(models.TextChoices):
-        INT = "INT", "Nombre entier"
-        STR = "STR", "Chaîne de caractères"
-        FLT = "FLT", "Nombre à virgule (Float)"
-        DCL = "DCL", "Nombre à virgule (Decimal)"
-        JSN = "JSN", "JSON"
-        BOO = "BOO", "Booléen"
-        DATE = "DAT", "Date (YYYY-MM-DD)"
-        DATETIME = "DTM", "Date et heure (ISO 8601)"
-        TIME = "TIM", "Heure (HH:MM:SS)"
-        URL = "URL", "URL validée"
-        EMAIL = "EML", "Email validé"
-        LIST = "LST", "Liste (séparée par virgules)"
-        DICT = "DCT", "Dictionnaire JSON"
-        PATH = "PTH", "Chemin de fichier"
-        DURATION = "DUR", "Durée (en secondes)"
-        PERCENTAGE = "PCT", "Pourcentage (0-100)"
+    Parameters are stored as strings in the database and converted to their
+    appropriate Python types when accessed. Supports encryption, validation,
+    and value history tracking.
+
+    The default value type is STR (string).
+    """
+
+    objects: ParameterManager = ParameterManager()  # pyright: ignore[reportIncompatibleVariableOverride]
 
     name = models.CharField("Nom", max_length=100)
     slug = models.SlugField(max_length=40, unique=True)
@@ -203,6 +67,8 @@ class Parameter(models.Model):
     )
     description = models.TextField("Description", blank=True)
     value = models.CharField("Valeur", max_length=250)
+
+    # OPTIONS
     is_global = models.BooleanField(default=False)
     enable_cypher = models.BooleanField(
         "Chiffrement activé",
@@ -218,144 +84,128 @@ class Parameter(models.Model):
         ),
     )
 
+    @classmethod
+    def from_db(
+        cls,
+        db: _str | None,
+        field_names: Collection[_str],
+        values: Collection[Any],
+    ) -> Parameter:
+        """Create instance from database row and convert to appropriate proxy class.
+
+        This method is called by Django's ORM when loading instances from the database.
+        It automatically converts the instance to the correct proxy class based on
+        the value_type field.
+        """
+        instance = super().from_db(db, field_names, values)
+        # Get value_type from the loaded values
+        field_names_list = _list(field_names)
+        values_list = _list(values)
+        if "value_type" in field_names_list:
+            value_type_idx = field_names_list.index("value_type")
+            value_type = values_list[value_type_idx]
+            proxy_class = get_proxy_class(value_type)
+            if proxy_class is not cls:
+                instance.__class__ = proxy_class  # type: ignore[assignment]
+        return instance
+
+    def _cast_from_str(self, value: _str) -> Any:
+        """Convert a string value to the parameter's native type.
+
+        Args:
+            value: The string value to convert.
+
+        Returns:
+            The value converted to the parameter's native type.
+        """
+        return _str(value)
+
+    def _cast_to_str(self, value: Any) -> _str:
+        """Convert a native type value to string for storage.
+
+        Args:
+            value: The native type value to convert.
+
+        Returns:
+            The string representation for database storage.
+
+        """
+        return _str(value).strip()
+
+    def _is_instance(self, value: Any) -> bool:
+        """Check if a value is of the expected native type.
+
+        Args:
+            value: The value to check.
+
+        Returns:
+            True if value is of the expected type, False otherwise.
+
+        """
+        return isinstance(value, _str)
+
+    type: _str = TYPES.STR
+
+    def get_type(self) -> _str:
+        """Return the TYPES value for this parameter.
+
+        Returns:
+            The type code (e.g., 'INT', 'STR', etc.). Defaults to 'STR'.
+
+        """
+        return self.type
+
     def save(self, *args: Any, **kwargs: Any) -> None:
+        """Save the parameter, auto-generating slug and setting value_type."""
+        # Only override value_type if using a typed proxy class (not base Parameter)
+        if type(self) is not Parameter:
+            self.value_type = self.get_type()
         if not self.slug:
             self.slug = parameter_slugify(self.name)
         super().save(*args, **kwargs)
 
-    def _get_raw_value(self) -> _str:
-        """
-        Get the raw value, decrypting it if enable_cypher is True.
-
-        Returns:
-            The decrypted value if enable_cypher is True, otherwise the raw value
-        """
+    def _get_decrypted_value(self, value: _str) -> _str:
+        """Decrypt value if encryption is enabled, otherwise return as-is."""
         if self.enable_cypher:
-            return decrypt_value(self.value)
-        return self.value
-
-    def _set_raw_value(self, value: _str) -> None:
-        """
-        Set the raw value, encrypting it if enable_cypher is True.
-
-        Args:
-            value: The plaintext value to store (will be encrypted if needed)
-        """
-        if self.enable_cypher:
-            self.value = encrypt_value(value)
-        else:
-            self.value = value
+            return decrypt_value(value)
+        return value
 
     def get(self) -> Any:
-        """Return parameter value casted accordingly to its value_type"""
-        functions: dict[str, str] = {
-            self.TYPES.INT: "int",
-            self.TYPES.STR: "str",
-            self.TYPES.FLT: "float",
-            self.TYPES.DCL: "decimal",
-            self.TYPES.JSN: "json",
-            self.TYPES.BOO: "bool",
-            self.TYPES.DATE: "date",
-            self.TYPES.DATETIME: "datetime",
-            self.TYPES.TIME: "time",
-            self.TYPES.URL: "url",
-            self.TYPES.EMAIL: "email",
-            self.TYPES.LIST: "list",
-            self.TYPES.DICT: "dict",
-            self.TYPES.PATH: "path",
-            self.TYPES.DURATION: "duration",
-            self.TYPES.PERCENTAGE: "percentage",
-        }
-        function_name = functions.get(self.value_type, "str")
-        return getattr(self, function_name)()
+        """Get the parameter value converted to its native type."""
+        str_value = self._get_decrypted_value(self.value)
+        typed_value = self._cast_from_str(str_value)
+        return typed_value
 
-    def int(self) -> int:
-        """Return parameter value casted as int()"""
-        return int(self._get_raw_value())
+    def set(self, new_value: Any, auto_cast: bool = False) -> None:
+        """Set the parameter value with type validation.
 
-    def str(self) -> _str:
-        """Return parameter value casted as str()"""
-        return self._get_raw_value()
+        Args:
+            new_value: The new value to set.
+            auto_cast: If True, convert string value to native type before
+                validation. Useful when setting from user input.
 
-    def float(self) -> float:
-        """Return parameter value casted as float()"""
-        return float(self._get_raw_value())
-
-    def decimal(self) -> Decimal:
-        """Return parameter value casted as Decimal()"""
-        return Decimal(self._get_raw_value())
-
-    def json(self) -> Any:
-        """Return parameter value casted as dict() using json lib"""
-        return json.loads(self._get_raw_value())
-
-    def bool(self) -> bool:
-        """Return parameter value casted as bool()"""
-        raw_value = self._get_raw_value()
-        if not raw_value or raw_value.lower() in ["false", "0"]:
-            return False
-        return bool(raw_value)
-
-    def date(self) -> date_type:
-        """Return parameter value casted as date() from ISO format YYYY-MM-DD"""
-        return datetime_type.fromisoformat(self._get_raw_value().strip()).date()
-
-    def datetime(self) -> _datetime:
-        """Return parameter value casted as datetime() from ISO 8601 format"""
-        return _datetime.fromisoformat(self._get_raw_value().strip())
-
-    def time(self) -> _time:
-        """Return parameter value casted as time() from HH:MM:SS format"""
-        return _datetime.strptime(self._get_raw_value().strip(), "%H:%M:%S").time()
-
-    def url(self) -> _str:
-        """Return parameter value validated as URL"""
-        url_value = self._get_raw_value().strip()
-        validator = URLValidator()
-        try:
-            validator(url_value)
-        except ValidationError as e:
-            raise ValueError(f"Invalid URL: {url_value}") from e
-        return url_value
-
-    def email(self) -> _str:
-        """Return parameter value validated as email"""
-        email_value = self._get_raw_value().strip()
-        try:
-            validate_email(email_value)
-        except ValidationError as e:
-            raise ValueError(f"Invalid email: {email_value}") from e
-        return email_value
-
-    def list(self) -> _list[_str]:
-        """Return parameter value as list split by comma"""
-        value_str = self._get_raw_value().strip()
-        if not value_str:
-            return []
-        return [item.strip() for item in value_str.split(",")]
-
-    def dict(self) -> _dict[_str, Any]:
-        """Return parameter value as dict from JSON"""
-        result = json.loads(self._get_raw_value())
-        if not isinstance(result, _dict):
-            raise ValueError(f"Expected dict, got {type(result).__name__}")
-        return result  # type: ignore[return-value]
-
-    def path(self) -> Path:
-        """Return parameter value as Path object"""
-        return Path(self._get_raw_value().strip())
-
-    def duration(self) -> timedelta:
-        """Return parameter value as timedelta from seconds"""
-        seconds = _float(self._get_raw_value())
-        return timedelta(seconds=seconds)
-
-    def percentage(self) -> _float:
-        """Return parameter value as percentage (validated 0-100)"""
-        value = _float(self._get_raw_value())
-        if not 0 <= value <= 100:
-            raise ValueError(f"Percentage must be between 0 and 100, got {value}")
-        return value
+        Raises:
+            ParameterValueTypeError: If value is not of expected type.
+            ValidationError: If value fails validator checks.
+        """
+        # auto cast force the value to parameter type before validation
+        if auto_cast:
+            new_value = self._cast_from_str(new_value)
+        # check if value is of expected type
+        if not self._is_instance(new_value):
+            raise ParameterValueTypeError(
+                f"Invalid type, expected {self.get_type()}"
+                f" got {type(new_value).__name__}"
+            )
+        # validation with validators, apply on typed value (int, datetime...)
+        self._run_validators(new_value)
+        # cast value to string for storage
+        str_value = self._cast_to_str(new_value)
+        # save to history if enabled
+        self._save_history(str_value)
+        # finally set the value
+        self.value = encrypt_value(str_value) if self.enable_cypher else str_value
+        self.save()
 
     def _run_validators(self, value: Any) -> None:
         """Run all associated validators on the value"""
@@ -366,253 +216,27 @@ class Parameter(models.Model):
             )
             validator(value)
 
-    def _save_to_history(self, new_raw_value: _str) -> None:
-        """Save current value to history if enable_history is True and value changed.
-
-        Args:
-            new_raw_value: The new value to be saved (in raw string format)
-        """
+    def _save_history(self, value: Any) -> None:
+        """Save current value to history before updating if history is enabled."""
         # Only save to history if:
         # 1. History is enabled
         # 2. Instance has a pk (is saved in DB)
         # 3. Value is different from current value
-        if self.enable_history and self.pk and self.value != new_raw_value:
-            logger.info("Saving to history for parameter %s", self.slug)
-            # Import here to avoid circular import
-            from django_app_parameter.models import ParameterHistory
+        if self.enable_history:
+            if self.pk:
+                current_value = self.get()  # not cyphered
+                if current_value != value:
+                    logger.info("Saving to history for parameter %s", self.slug)
+                    from django_app_parameter.models import ParameterHistory
 
-            # Save current value to history before updating
-            ParameterHistory.objects.create(
-                parameter=self,
-                value=self.value,  # Save current (old) value
-            )
+                    # Save current value to history before updating
+                    # if parameter is cyphered, self.value is excpected to be encrypted
+                    ParameterHistory.objects.create(
+                        parameter=self,
+                        value=self.value,  # Save current (old) value
+                    )
 
-    def set(self, new_value: Any) -> None:
-        """Set parameter value with automatic conversion based on value_type"""
-        # Run validators before conversion
-        self._run_validators(new_value)
-
-        functions: _dict[_str, _str] = {
-            self.TYPES.INT: "set_int",
-            self.TYPES.STR: "set_str",
-            self.TYPES.FLT: "set_float",
-            self.TYPES.DCL: "set_decimal",
-            self.TYPES.JSN: "set_json",
-            self.TYPES.BOO: "set_bool",
-            self.TYPES.DATE: "set_date",
-            self.TYPES.DATETIME: "set_datetime",
-            self.TYPES.TIME: "set_time",
-            self.TYPES.URL: "set_url",
-            self.TYPES.EMAIL: "set_email",
-            self.TYPES.LIST: "set_list",
-            self.TYPES.DICT: "set_dict",
-            self.TYPES.PATH: "set_path",
-            self.TYPES.DURATION: "set_duration",
-            self.TYPES.PERCENTAGE: "set_percentage",
-        }
-        function_name = functions.get(self.value_type, "set_str")
-        function = getattr(self, function_name)
-        function(new_value)
-
-    def set_int(self, new_value: Any) -> None:
-        """Set parameter value from int"""
-        if not isinstance(new_value, int):
-            raise TypeError(f"Expected int, got {type(new_value).__name__}")
-        self._run_validators(new_value)
-        new_raw_value = _str(new_value)
-        encrypted_value = (
-            encrypt_value(new_raw_value) if self.enable_cypher else new_raw_value
-        )
-        self._save_to_history(encrypted_value)
-        self._set_raw_value(new_raw_value)
-        self.save()
-
-    def set_str(self, new_value: Any) -> None:
-        """Set parameter value from str"""
-        if not isinstance(new_value, str):
-            raise TypeError(f"Expected str, got {type(new_value).__name__}")
-        encrypted_value = encrypt_value(new_value) if self.enable_cypher else new_value
-        self._save_to_history(encrypted_value)
-        self._set_raw_value(new_value)
-        self.save()
-
-    def set_float(self, new_value: Any) -> None:
-        """Set parameter value from float"""
-        if not isinstance(new_value, float):
-            raise TypeError(f"Expected float, got {type(new_value).__name__}")
-        new_raw_value = _str(new_value)
-        encrypted_value = (
-            encrypt_value(new_raw_value) if self.enable_cypher else new_raw_value
-        )
-        self._save_to_history(encrypted_value)
-        self._set_raw_value(new_raw_value)
-        self.save()
-
-    def set_decimal(self, new_value: Any) -> None:
-        """Set parameter value from Decimal"""
-        if not isinstance(new_value, Decimal):
-            raise TypeError(f"Expected Decimal, got {type(new_value).__name__}")
-        new_raw_value = _str(new_value)
-        encrypted_value = (
-            encrypt_value(new_raw_value) if self.enable_cypher else new_raw_value
-        )
-        self._save_to_history(encrypted_value)
-        self._set_raw_value(new_raw_value)
-        self.save()
-
-    def set_json(self, new_value: Any) -> None:
-        """Set parameter value from JSON-serializable object"""
-        new_raw_value = json.dumps(new_value)
-        encrypted_value = (
-            encrypt_value(new_raw_value) if self.enable_cypher else new_raw_value
-        )
-        self._save_to_history(encrypted_value)
-        self._set_raw_value(new_raw_value)
-        self.save()
-
-    def set_bool(self, new_value: Any) -> None:
-        """Set parameter value from bool"""
-        if not isinstance(new_value, bool):
-            raise TypeError(f"Expected bool, got {type(new_value).__name__}")
-        new_raw_value = "1" if new_value else "0"
-        encrypted_value = (
-            encrypt_value(new_raw_value) if self.enable_cypher else new_raw_value
-        )
-        self._save_to_history(encrypted_value)
-        self._set_raw_value(new_raw_value)
-        self.save()
-
-    def set_date(self, new_value: Any) -> None:
-        """Set parameter value from date object"""
-        if not isinstance(new_value, date_type):
-            raise TypeError(f"Expected date, got {type(new_value).__name__}")
-        new_raw_value = new_value.isoformat()
-        encrypted_value = (
-            encrypt_value(new_raw_value) if self.enable_cypher else new_raw_value
-        )
-        self._save_to_history(encrypted_value)
-        self._set_raw_value(new_raw_value)
-        self.save()
-
-    def set_datetime(self, new_value: Any) -> None:
-        """Set parameter value from datetime object"""
-        if not isinstance(new_value, datetime_type):
-            raise TypeError(f"Expected datetime, got {type(new_value).__name__}")
-        new_raw_value = new_value.isoformat()
-        encrypted_value = (
-            encrypt_value(new_raw_value) if self.enable_cypher else new_raw_value
-        )
-        self._save_to_history(encrypted_value)
-        self._set_raw_value(new_raw_value)
-        self.save()
-
-    def set_time(self, new_value: Any) -> None:
-        """Set parameter value from time object"""
-        if not isinstance(new_value, time_type):
-            raise TypeError(f"Expected time, got {type(new_value).__name__}")
-        new_raw_value = new_value.strftime("%H:%M:%S")
-        encrypted_value = (
-            encrypt_value(new_raw_value) if self.enable_cypher else new_raw_value
-        )
-        self._save_to_history(encrypted_value)
-        self._set_raw_value(new_raw_value)
-        self.save()
-
-    def set_url(self, new_value: Any) -> None:
-        """Set parameter value from URL string (validates before saving)"""
-        if not isinstance(new_value, str):
-            raise TypeError(f"Expected str, got {type(new_value).__name__}")
-        url_value = new_value.strip()
-        validator = URLValidator()
-        try:
-            validator(url_value)
-        except ValidationError as e:
-            raise ValueError(f"Invalid URL: {url_value}") from e
-        encrypted_value = encrypt_value(url_value) if self.enable_cypher else url_value
-        self._save_to_history(encrypted_value)
-        self._set_raw_value(url_value)
-        self.save()
-
-    def set_email(self, new_value: Any) -> None:
-        """Set parameter value from email string (validates before saving)"""
-        if not isinstance(new_value, str):
-            raise TypeError(f"Expected str, got {type(new_value).__name__}")
-        email_value = new_value.strip()
-        try:
-            validate_email(email_value)
-        except ValidationError as e:
-            raise ValueError(f"Invalid email: {email_value}") from e
-        encrypted_value = (
-            encrypt_value(email_value) if self.enable_cypher else email_value
-        )
-        self._save_to_history(encrypted_value)
-        self._set_raw_value(email_value)
-        self.save()
-
-    def set_list(self, new_value: Any) -> None:
-        """Set parameter value from list"""
-        if not isinstance(new_value, list):
-            raise TypeError(f"Expected list, got {type(new_value).__name__}")
-        typed_list = cast(_list[Any], new_value)
-        new_raw_value = ", ".join(str(item) for item in typed_list)
-        encrypted_value = (
-            encrypt_value(new_raw_value) if self.enable_cypher else new_raw_value
-        )
-        self._save_to_history(encrypted_value)
-        self._set_raw_value(new_raw_value)
-        self.save()
-
-    def set_dict(self, new_value: Any) -> None:
-        """Set parameter value from dict"""
-        if not isinstance(new_value, dict):
-            raise TypeError(f"Expected dict, got {type(new_value).__name__}")
-        new_raw_value = json.dumps(new_value)
-        encrypted_value = (
-            encrypt_value(new_raw_value) if self.enable_cypher else new_raw_value
-        )
-        self._save_to_history(encrypted_value)
-        self._set_raw_value(new_raw_value)
-        self.save()
-
-    def set_path(self, new_value: Any) -> None:
-        """Set parameter value from Path object"""
-        if not isinstance(new_value, Path):
-            raise TypeError(f"Expected Path, got {type(new_value).__name__}")
-        new_raw_value = _str(new_value)
-        encrypted_value = (
-            encrypt_value(new_raw_value) if self.enable_cypher else new_raw_value
-        )
-        self._save_to_history(encrypted_value)
-        self._set_raw_value(new_raw_value)
-        self.save()
-
-    def set_duration(self, new_value: Any) -> None:
-        """Set parameter value from timedelta object"""
-        if not isinstance(new_value, timedelta):
-            raise TypeError(f"Expected timedelta, got {type(new_value).__name__}")
-        new_raw_value = _str(new_value.total_seconds())
-        encrypted_value = (
-            encrypt_value(new_raw_value) if self.enable_cypher else new_raw_value
-        )
-        self._save_to_history(encrypted_value)
-        self._set_raw_value(new_raw_value)
-        self.save()
-
-    def set_percentage(self, new_value: Any) -> None:
-        """Set parameter value from percentage (validates 0-100)"""
-        if not isinstance(new_value, float | int):
-            raise TypeError(f"Expected float or int, got {type(new_value).__name__}")
-        if not 0 <= new_value <= 100:
-            raise ValueError(f"Percentage must be between 0 and 100, got {new_value}")
-        new_raw_value = _str(new_value)
-        encrypted_value = (
-            encrypt_value(new_raw_value) if self.enable_cypher else new_raw_value
-        )
-        self._save_to_history(encrypted_value)
-        self._set_raw_value(new_raw_value)
-        self.save()
-
-    def to_dict(self) -> ParameterDict:
+    def to_dict(self, decrypt: bool = True) -> ParameterDict_:
         """Export this parameter instance to JSON-compatible dictionary.
 
         Returns:
@@ -620,10 +244,10 @@ class Parameter(models.Model):
             Note: The value is exported in decrypted form for portability.
             History entries are NOT exported.
         """
-        param_data: ParameterDict = {
+        param_data: ParameterDict_ = {
             "name": self.name,
             "slug": self.slug,
-            "value": self._get_raw_value(),  # Export decrypted value
+            "value": self._get_decrypted_value(self.value) if decrypt else self.value,
             "value_type": self.value_type,
             "description": self.description,
             "is_global": self.is_global,
@@ -646,7 +270,7 @@ class Parameter(models.Model):
 
         return param_data
 
-    def from_dict(self, data: ParameterDict) -> None:
+    def from_dict(self, data: ParameterDict_, force_encrypt: bool = False) -> None:
         """Update this parameter instance from a dictionary.
 
         Args:
@@ -656,10 +280,15 @@ class Parameter(models.Model):
                   Validators are always processed: if not present in data, existing
                   validators are removed.
                   History entries are NOT imported.
+            force_encrypt: If True, the 'value' field in data is treated as
+                  unencrypted and will be encrypted if 'enable_cypher' is True.
         """
+        value = data.get("value", self.value)
+        force_encrypt &= bool(data.get("enable_cypher", self.enable_cypher))
+
         # Update basic fields
         self.name = data.get("name", self.name)
-        self.value = data.get("value", self.value)
+        self.value = encrypt_value(value) if force_encrypt else value
         self.description = data.get("description", self.description)
         self.is_global = data.get("is_global", self.is_global)
         self.enable_cypher = data.get("enable_cypher", self.enable_cypher)
@@ -723,6 +352,7 @@ class Parameter(models.Model):
             )
 
     def __str__(self) -> _str:
+        """Return the parameter name as string representation."""
         return self.name
 
 
@@ -790,6 +420,7 @@ class ParameterValidator(models.Model):
         return cast(Callable[[Any], None], validator_class(**params))
 
     def __str__(self) -> _str:
+        """Return parameter name and validator display name."""
         available = get_available_validators()
         display_name = available.get(self.validator_type, self.validator_type)
         return f"{self.parameter.name} - {display_name}"
@@ -821,4 +452,352 @@ class ParameterHistory(models.Model):
         ordering = ["-modified_at"]
 
     def __str__(self) -> _str:
+        """Return value and modification timestamp."""
         return f"{self.value} - {self.modified_at.strftime('%Y-%m-%d %H:%M:%S')}"
+
+
+# =============================================================================
+# Typed Parameter Proxy Models
+# =============================================================================
+
+
+class ParameterInt(Parameter):
+    """Proxy model for integer parameters."""
+
+    type = TYPES.INT
+
+    class Meta:
+        proxy = True
+
+    def _cast_from_str(self, value: _str) -> int:
+        """Convert string to integer."""
+        return int(value)
+
+    def _cast_to_str(self, value: int) -> _str:
+        """Convert integer to string."""
+        return _str(value)
+
+    def _is_instance(self, value: Any) -> bool:
+        """Check if value is an integer."""
+        return isinstance(value, int)
+
+
+class ParameterStr(Parameter):
+    """Proxy model for string parameters."""
+
+    class Meta:
+        proxy = True
+
+
+class ParameterFloat(Parameter):
+    """Proxy model for float parameters."""
+
+    type = TYPES.FLT
+
+    class Meta:
+        proxy = True
+
+    def _cast_from_str(self, value: _str) -> _float:
+        """Convert string to float."""
+        return _float(value)
+
+    def _is_instance(self, value: Any) -> bool:
+        """Check if value is a float."""
+        return isinstance(value, float)
+
+
+class ParameterDecimal(Parameter):
+    """Proxy model for Decimal parameters."""
+
+    type = TYPES.DCL
+
+    class Meta:
+        proxy = True
+
+    def _cast_from_str(self, value: _str) -> Decimal:
+        """Convert string to Decimal."""
+        return Decimal(value)
+
+    def _is_instance(self, value: Any) -> bool:
+        """Check if value is a Decimal."""
+        return isinstance(value, Decimal)
+
+
+class ParameterJson(Parameter):
+    """Proxy model for JSON parameters."""
+
+    type = TYPES.JSN
+
+    class Meta:
+        proxy = True
+
+    def _cast_from_str(self, value: _str) -> Any:
+        """Parse JSON string to Python object."""
+        return json.loads(value)
+
+    def _cast_to_str(self, value: Any) -> _str:
+        """Serialize Python object to JSON string."""
+        return json.dumps(value)
+
+    def _is_instance(self, value: Any) -> bool:
+        """Check if value is JSON-serializable."""
+        if not isinstance(value, (dict, list)):
+            return False
+        try:
+            json.dumps(value)
+            return True
+        except (TypeError, ValueError):
+            return False
+
+
+class ParameterBool(Parameter):
+    """Proxy model for boolean parameters."""
+
+    type = TYPES.BOO
+
+    FALSY_VALUES = ["false", "0", "no", "off"]
+
+    class Meta:
+        proxy = True
+
+    def _cast_from_str(self, value: _str) -> _bool:
+        """Convert string to boolean. Empty, 'false', '0' are False."""
+        if not value or value.lower() in self.FALSY_VALUES:
+            return False
+        return True
+
+    def _cast_to_str(self, value: _bool) -> _str:
+        """Convert boolean to '1' or '0'."""
+        return "1" if value else "0"
+
+    def _is_instance(self, value: Any) -> bool:
+        """Check if value is a boolean."""
+        return isinstance(value, bool)
+
+
+class ParameterDate(Parameter):
+    """Proxy model for date parameters."""
+
+    type = TYPES.DATE
+
+    class Meta:
+        proxy = True
+
+    def _cast_from_str(self, value: _str) -> date_type:
+        """Parse ISO format string (YYYY-MM-DD) to date."""
+        return datetime_type.fromisoformat(value.strip()).date()
+
+    def _cast_to_str(self, value: date_type) -> _str:
+        """Convert date to ISO format string."""
+        return value.isoformat()
+
+    def _is_instance(self, value: Any) -> bool:
+        """Check if value is a date (but not datetime)."""
+        return isinstance(value, date_type) and not isinstance(value, datetime_type)
+
+
+class ParameterDatetime(Parameter):
+    """Proxy model for datetime parameters."""
+
+    type = TYPES.DATETIME
+
+    class Meta:
+        proxy = True
+
+    def _cast_from_str(self, value: _str) -> _datetime:
+        """Parse ISO 8601 format string to datetime."""
+        return _datetime.fromisoformat(value.strip())
+
+    def _cast_to_str(self, value: _datetime) -> _str:
+        """Convert datetime to ISO 8601 format string."""
+        return value.isoformat()
+
+    def _is_instance(self, value: Any) -> bool:
+        """Check if value is a datetime."""
+        return isinstance(value, datetime_type)
+
+
+class ParameterTime(Parameter):
+    """Proxy model for time parameters."""
+
+    type = TYPES.TIME
+
+    class Meta:
+        proxy = True
+
+    def _cast_from_str(self, value: _str) -> _time:
+        """Parse HH:MM:SS format string to time."""
+        return _datetime.strptime(value.strip(), "%H:%M:%S").time()
+
+    def _cast_to_str(self, value: _time) -> _str:
+        """Convert time to HH:MM:SS format string."""
+        return value.strftime("%H:%M:%S")
+
+    def _is_instance(self, value: Any) -> bool:
+        """Check if value is a time."""
+        return isinstance(value, time_type)
+
+
+class ParameterUrl(Parameter):
+    """Proxy model for URL parameters with validation."""
+
+    type = TYPES.URL
+
+    class Meta:
+        proxy = True
+
+    def _cast_from_str(self, value: _str) -> _str:
+        """Validate and return URL string."""
+        url_value = value.strip()
+        validator = URLValidator()
+        try:
+            validator(url_value)
+        except ValidationError as e:
+            raise ValueError(f"Invalid URL: {url_value}") from e
+        return url_value
+
+    def _is_instance(self, value: Any) -> bool:
+        """Check if value is a valid URL string."""
+        if not isinstance(value, str):
+            return False
+        validator = URLValidator()
+        try:
+            validator(value)
+            return True
+        except ValidationError:
+            return False
+
+
+class ParameterEmail(Parameter):
+    """Proxy model for email parameters with validation."""
+
+    type = TYPES.EMAIL
+
+    class Meta:
+        proxy = True
+
+    def _cast_from_str(self, value: _str) -> _str:
+        """Validate and return email string."""
+        email_value = value.strip()
+        try:
+            validate_email(email_value)
+        except ValidationError as e:
+            raise ValueError(f"Invalid email: {email_value}") from e
+        return email_value
+
+    def _is_instance(self, value: Any) -> bool:
+        """Check if value is a valid email string."""
+        if not isinstance(value, str):
+            return False
+        try:
+            validate_email(value)
+            return True
+        except ValidationError:
+            return False
+
+
+class ParameterList(Parameter):
+    """Proxy model for comma-separated list parameters."""
+
+    type = TYPES.LIST
+
+    class Meta:
+        proxy = True
+
+    def _cast_from_str(self, value: _str) -> _list[_str]:
+        """Split comma-separated string into list of strings."""
+        value_str = value.strip()
+        if not value_str:
+            return []
+        return [item.strip() for item in value_str.split(",")]
+
+    def _cast_to_str(self, value: _list[Any]) -> _str:
+        """Join list items with comma separator."""
+        return ",".join(_str(item) for item in value)
+
+    def _is_instance(self, value: Any) -> bool:
+        """Check if value is a list."""
+        return isinstance(value, list)
+
+
+class ParameterDict(Parameter):
+    """Proxy model for dict parameters (suffixed to avoid conflict with TypedDict)."""
+
+    type = TYPES.DICT
+
+    class Meta:
+        proxy = True
+
+    def _cast_from_str(self, value: _str) -> _dict[_str, Any]:
+        """Parse JSON string to dict."""
+        result = json.loads(value)
+        if not isinstance(result, _dict):
+            raise ValueError(f"Expected dict, got {type(result).__name__}")
+        return result  # type: ignore[return-value]
+
+    def _cast_to_str(self, value: _dict[_str, Any]) -> _str:
+        """Serialize dict to JSON string."""
+        return json.dumps(value)
+
+    def _is_instance(self, value: Any) -> bool:
+        """Check if value is a dict."""
+        return isinstance(value, dict)
+
+
+class ParameterPath(Parameter):
+    """Proxy model for filesystem path parameters."""
+
+    type = TYPES.PATH
+
+    class Meta:
+        proxy = True
+
+    def _cast_from_str(self, value: _str) -> Path:
+        """Convert string to Path object."""
+        return Path(value.strip())
+
+    def _is_instance(self, value: Any) -> bool:
+        """Check if value is a Path."""
+        return isinstance(value, Path)
+
+
+class ParameterDuration(Parameter):
+    """Proxy model for duration parameters stored as seconds."""
+
+    type = TYPES.DURATION
+
+    class Meta:
+        proxy = True
+
+    def _cast_from_str(self, value: _str) -> timedelta:
+        """Convert seconds string to timedelta."""
+        seconds = _float(value)
+        return timedelta(seconds=seconds)
+
+    def _cast_to_str(self, value: timedelta) -> _str:
+        """Convert timedelta to total seconds string."""
+        return _str(value.total_seconds())
+
+    def _is_instance(self, value: Any) -> bool:
+        """Check if value is a timedelta."""
+        return isinstance(value, timedelta)
+
+
+class ParameterPercentage(Parameter):
+    """Proxy model for percentage parameters (0-100)."""
+
+    type = TYPES.PERCENTAGE
+
+    class Meta:
+        proxy = True
+
+    def _cast_from_str(self, value: _str) -> _float:
+        """Convert string to float, validating range 0-100."""
+        result = _float(value)
+        if not 0 <= result <= 100:
+            raise ValueError(f"Percentage must be between 0 and 100, got {result}")
+        return result
+
+    def _is_instance(self, value: Any) -> bool:
+        """Check if value is a float or int."""
+        return isinstance(value, (float, int))

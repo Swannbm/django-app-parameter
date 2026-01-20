@@ -3,6 +3,7 @@
 import json
 from io import StringIO
 from pathlib import Path
+from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -10,17 +11,18 @@ from cryptography.fernet import Fernet
 from django.core.exceptions import ImproperlyConfigured
 from django.core.management import call_command
 
+from django_app_parameter.constants import TYPES
 from django_app_parameter.models import Parameter
 
 
 @pytest.fixture
-def encryption_key():
+def encryption_key() -> str:
     """Generate a test encryption key."""
     return Fernet.generate_key().decode("utf-8")
 
 
 @pytest.fixture
-def configure_encryption(settings, encryption_key):
+def configure_encryption(settings: Any, encryption_key: str) -> str:
     """Configure encryption key in settings."""
     if not hasattr(settings, "DJANGO_APP_PARAMETER"):
         settings.DJANGO_APP_PARAMETER = {}
@@ -47,11 +49,11 @@ class TestRotateKeyCommandStep1:
         # Create encrypted parameter
         param = Parameter.objects.create(
             name="Secret",
-            value_type=Parameter.TYPES.STR,
+            value_type=TYPES.STR,
             value="test",
             enable_cypher=True,
         )
-        param.set_str("secret_value")
+        param.set("secret_value")
 
         backup_file = tmp_path / "backup.json"
         old_key = configure_encryption
@@ -139,19 +141,19 @@ class TestRotateKeyCommandStep2:
         old_key = configure_encryption
         param1 = Parameter.objects.create(
             name="Secret1",
-            value_type=Parameter.TYPES.STR,
+            value_type=TYPES.STR,
             value="test1",
             enable_cypher=True,
         )
-        param1.set_str("value1")
+        param1.set("value1")
 
         param2 = Parameter.objects.create(
             name="Secret2",
-            value_type=Parameter.TYPES.INT,
+            value_type=TYPES.INT,
             value="10",
             enable_cypher=True,
         )
-        param2.set_int(42)
+        param2.set(42)
 
         # Generate and configure new key in settings
         new_key = Fernet.generate_key().decode("utf-8")
@@ -184,19 +186,19 @@ class TestRotateKeyCommandStep2:
         assert param2.value.startswith("gAAAAA")
 
         # Should be able to decrypt with new key
-        assert param1.str() == "value1"
-        assert param2.int() == 42
+        assert param1.get() == "value1"
+        assert param2.get() == 42
 
     def test_step2_with_invalid_old_key(self, db, configure_encryption, tmp_path):
         """Test step 2 with invalid old key."""
         # Create encrypted parameter
         param = Parameter.objects.create(
             name="Secret",
-            value_type=Parameter.TYPES.STR,
+            value_type=TYPES.STR,
             value="test",
             enable_cypher=True,
         )
-        param.set_str("value")
+        param.set("value")
 
         # Try with invalid old key
         backup_file = tmp_path / "backup.json"
@@ -234,11 +236,11 @@ class TestRotateKeyCommandStep2:
         # Create encrypted parameter
         param = Parameter.objects.create(
             name="Secret",
-            value_type=Parameter.TYPES.STR,
+            value_type=TYPES.STR,
             value="test",
             enable_cypher=True,
         )
-        param.set_str("value")
+        param.set("value")
 
         # Use wrong old key
         wrong_old_key = Fernet.generate_key().decode("utf-8")
@@ -385,11 +387,11 @@ class TestRotateKeyCommandExceptionHandling:
         old_key = configure_encryption
         param = Parameter.objects.create(
             name="Secret",
-            value_type=Parameter.TYPES.STR,
+            value_type=TYPES.STR,
             value="test",
             enable_cypher=True,
         )
-        param.set_str("value")
+        param.set("value")
 
         # Generate new key
         new_key = Fernet.generate_key().decode("utf-8")

@@ -31,7 +31,7 @@ title = app_parameter.BLOG_TITLE  # Auto-converti au bon type
 
 ### 2. Manager Pattern - ParameterManager
 
-**Localisation**: [django_app_parameter/models.py](django_app_parameter/models.py)
+**Localisation**: [django_app_parameter/managers.py](django_app_parameter/managers.py)
 
 **Usage**: Étendre Django Manager avec méthodes spécifiques au domaine
 
@@ -45,53 +45,55 @@ class ParameterManager(models.Manager):
             return self.get(slug=slug)
         except self.model.DoesNotExist:
             raise ImproperlyConfigured(f"Parameter {slug} not found")
-
-    def int(self, slug: str) -> int:
-        """Raccourci pour récupérer un entier"""
-        return self.get_from_slug(slug).int()
-
-    # ... autres méthodes typées
 ```
 
 **Avantages**:
 - Encapsule la logique métier
-- Fournit des raccourcis typés
 - Gestion d'erreur cohérente
+- Retourne l'objet Parameter complet pour utiliser `get()` et `set()`
 
-### 3. Strategy Pattern - Conversion de types
+### 3. Proxy Classes - Typed Parameter Models
 
-**Localisation**: [django_app_parameter/models.py](django_app_parameter/models.py) (`get()` et `set()`)
+**Localisation**: [django_app_parameter/models.py](django_app_parameter/models.py)
 
-**Usage**: Dispatch basé sur dictionnaire pour conversion de types
+**Usage**: Sous-classes proxy pour chaque type de paramètre
 
 ```python
-def get(self) -> ParameterReturnType:
-    """Conversion automatique selon value_type"""
-    functions = {
-        self.TYPES.INT: "int",
-        self.TYPES.STR: "str",
-        self.TYPES.FLT: "float",
-        self.TYPES.DCL: "decimal",
-        # ... autres mappings
-    }
-    method_name = functions[self.value_type]
-    return getattr(self, method_name)()
+class Parameter(models.Model):
+    """Modèle de base avec get() et set()"""
 
-def set(self, value: ParameterAcceptType) -> None:
-    """Route vers le bon setter selon value_type"""
-    setters = {
-        self.TYPES.INT: self.set_int,
-        self.TYPES.STR: self.set_str,
-        # ... autres mappings
-    }
-    setter_func = setters[self.value_type]
-    setter_func(value)
+    def get(self) -> Any:
+        """Retourne la valeur convertie au type natif"""
+        str_value = self._get_decrypted_value(self.value)
+        return self._cast_from_str(str_value)
+
+    def set(self, new_value: Any, auto_cast: bool = False) -> None:
+        """Définit la valeur avec validation de type"""
+        if auto_cast:
+            new_value = self._cast_from_str(new_value)
+        if not self._is_instance(new_value):
+            raise ParameterValueTypeError(...)
+        self._run_validators(new_value)
+        self.value = self._cast_to_str(new_value)
+        self.save()
+
+class ParameterInt(Parameter):
+    """Proxy pour paramètres entiers"""
+    class Meta:
+        proxy = True
+
+    def _cast_from_str(self, value: str) -> int:
+        return int(value)
+
+    def _is_instance(self, value: Any) -> bool:
+        return isinstance(value, int)
 ```
 
 **Avantages**:
-- Évite les chaînes if/elif
-- Facile à étendre avec nouveaux types
-- Mapping clair et maintenable
+- Chaque type a sa propre classe avec logique de conversion
+- `from_db()` retourne automatiquement la bonne sous-classe
+- `get()` et `set()` fonctionnent pour tous les types
+- `auto_cast` permet de convertir depuis string facilement
 
 ### 4. Registry Pattern - Validateurs
 
@@ -159,7 +161,7 @@ class ParameterValidator(models.Model):
 
 ### Aliasing de types built-in
 
-**Pourquoi**: Éviter conflits avec noms de méthodes
+**Pourquoi**: Éviter conflits avec noms de classes/méthodes
 
 ```python
 # En haut du fichier models.py
@@ -170,14 +172,14 @@ _bool = bool
 _int = int
 _float = float
 
-# Utilisation
-def str(self) -> _str:
-    """Méthode nommée 'str' mais retourne type 'str'"""
-    return _str(self.value)
+# Utilisation dans les sous-classes
+class ParameterInt(Parameter):
+    def _cast_from_str(self, value: _str) -> _int:
+        return _int(value)
 
-def list(self) -> _list[_str]:
-    """Retourne une liste Python native"""
-    return self.value.split(",")
+class ParameterList(Parameter):
+    def _cast_from_str(self, value: _str) -> _list[_str]:
+        return [item.strip() for item in value.split(",")]
 ```
 
 ### Type hints complets
@@ -185,26 +187,23 @@ def list(self) -> _list[_str]:
 **Standard**: Type hints sur toutes les signatures publiques
 
 ```python
-from typing import TYPE_CHECKING
+from typing import Any
+from decimal import Decimal
 
-if TYPE_CHECKING:
-    from decimal import Decimal
-    from datetime import date, datetime, time, timedelta
-    from pathlib import Path
+class ParameterDecimal(Parameter):
+    """Proxy pour paramètres Decimal"""
 
-def decimal(self) -> "Decimal":
-    """Type hint conditionnel pour éviter imports runtime"""
-    from decimal import Decimal
-    return Decimal(self.value)
+    def _cast_from_str(self, value: _str) -> Decimal:
+        return Decimal(value)
 
-def set_decimal(self, value: "Decimal") -> None:
-    """Setter avec vérification de type"""
-    from decimal import Decimal
-    if not isinstance(value, Decimal):
-        raise TypeError(f"Expected Decimal, got {type(value)}")
-    self.value = _str(value)
-    self._run_validators()
-    self.save()
+    def _is_instance(self, value: Any) -> bool:
+        return isinstance(value, Decimal)
+
+# Usage
+param = Parameter.objects.get(slug="TAX_RATE")
+value = param.get()  # Returns Decimal
+param.set(Decimal("19.6"))  # Accepts Decimal
+param.set("19.6", auto_cast=True)  # Converts string to Decimal
 ```
 
 ### Gestion d'erreurs cohérente
@@ -224,21 +223,16 @@ def get_from_slug(self, slug: str) -> "Parameter":
             f"Please create it in Django admin."
         )
 
-# Conversion invalide
-def int(self) -> _int:
-    try:
-        return _int(self.value)
-    except ValueError as e:
-        raise ValueError(
-            f"Cannot convert '{self.value}' to int for parameter '{self.slug}'"
-        ) from e
+# Type incorrect dans set()
+from django_app_parameter.models import ParameterValueTypeError
 
-# Type incorrect dans setter
-def set_int(self, value: _int) -> None:
-    if not isinstance(value, _int):
-        raise TypeError(
-            f"Expected int, got {type(value).__name__} "
-            f"for parameter '{self.slug}'"
+def set(self, new_value: Any, auto_cast: bool = False) -> None:
+    if auto_cast:
+        new_value = self._cast_from_str(new_value)
+    if not self._is_instance(new_value):
+        raise ParameterValueTypeError(
+            f"Invalid type, expected {self.get_type()} "
+            f"got {type(new_value).__name__}"
         )
 ```
 
@@ -328,11 +322,10 @@ def save(self, *args, **kwargs):
 def add_global_parameter_context(request):
     """Ajoute tous les paramètres globaux au contexte.
 
-    Note: Les valeurs sont toujours en string pour simplicité.
-    Pour typage fort, utiliser app_parameter dans les vues.
+    Note: Les valeurs sont retournées dans leur type natif (int, bool, etc.).
     """
     return {
-        param.slug: param.str()
+        param.slug: param.get()
         for param in Parameter.objects.filter(is_global=True)
     }
 ```
@@ -374,14 +367,14 @@ class ParameterEditForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
 
         # Customiser le champ selon value_type
-        if self.instance.value_type == Parameter.TYPES.BOO:
+        if self.instance.value_type == TYPES.BOO:
             self.fields['value'] = forms.BooleanField(
                 required=False,
-                initial=self.instance.bool()
+                initial=self.instance.get()
             )
-        elif self.instance.value_type == Parameter.TYPES.INT:
+        elif self.instance.value_type == TYPES.INT:
             self.fields['value'] = forms.IntegerField(
-                initial=self.instance.int()
+                initial=self.instance.get()
             )
         # ... autres types
 ```
@@ -438,7 +431,7 @@ def string_parameter(db):
     """Paramètre string basique"""
     return Parameter.objects.create(
         name="Test String",
-        value_type=Parameter.TYPES.STR,
+        value_type=TYPES.STR,
         value="test value"
     )
 
@@ -447,7 +440,7 @@ def int_parameter_with_validators(db):
     """Paramètre int avec validateurs"""
     param = Parameter.objects.create(
         name="Test Int",
-        value_type=Parameter.TYPES.INT,
+        value_type=TYPES.INT,
         value="42"
     )
     param.parametervalidator_set.create(
@@ -467,10 +460,10 @@ def int_parameter_with_validators(db):
 import pytest
 
 @pytest.mark.parametrize("value_type,value,expected", [
-    (Parameter.TYPES.INT, "42", 42),
-    (Parameter.TYPES.FLT, "3.14", 3.14),
-    (Parameter.TYPES.BOO, "true", True),
-    (Parameter.TYPES.LST, "a,b,c", ["a", "b", "c"]),
+    (TYPES.INT, "42", 42),
+    (TYPES.FLT, "3.14", 3.14),
+    (TYPES.BOO, "true", True),
+    (TYPES.LST, "a,b,c", ["a", "b", "c"]),
 ])
 def test_parameter_conversion(db, value_type, value, expected):
     """Test conversion pour tous les types"""
@@ -513,114 +506,103 @@ def test_admin_change_view(admin_client, string_parameter):
 
 **Checklist complète**:
 
-1. **Ajouter le type dans models.py**:
+1. **Ajouter le type dans constants.py**:
 ```python
-class Parameter(models.Model):
-    class TYPES(models.TextChoices):
-        # ... existants
-        IPV = "IPV", "IPv4 Address"  # Nouveau type
-
-    VALUE_TYPE_CHOICES = [
-        # ... existants
-        (TYPES.IPV, "IPv4 Address"),
-    ]
+class TYPES(models.TextChoices):
+    # ... existants
+    IPV = "IPV", "IPv4 Address"  # Nouveau type
 ```
 
-2. **Ajouter getter**:
+2. **Créer la classe proxy dans models.py**:
 ```python
-def ipv4(self) -> _str:
-    """Retourne adresse IPv4 validée"""
-    from django.core.validators import validate_ipv4_address
-    validate_ipv4_address(self.value)
-    return self.value
+class ParameterIpv4(Parameter):
+    """Proxy model for IPv4 address parameters."""
+
+    type = TYPES.IPV
+
+    class Meta:
+        proxy = True
+
+    def _cast_from_str(self, value: _str) -> _str:
+        """Validate and return IPv4 address."""
+        from django.core.validators import validate_ipv4_address
+        validate_ipv4_address(value.strip())
+        return value.strip()
+
+    def _is_instance(self, value: Any) -> bool:
+        """Check if value is a valid IPv4 string."""
+        if not isinstance(value, str):
+            return False
+        from django.core.validators import validate_ipv4_address
+        try:
+            validate_ipv4_address(value)
+            return True
+        except ValidationError:
+            return False
 ```
 
-3. **Ajouter setter**:
+3. **Enregistrer dans managers.py**:
 ```python
-def set_ipv4(self, value: _str) -> None:
-    """Définit adresse IPv4 avec validation"""
-    from django.core.validators import validate_ipv4_address
-    if not isinstance(value, _str):
-        raise TypeError(f"Expected str, got {type(value)}")
-    validate_ipv4_address(value)  # Valide avant de stocker
-    self.value = value
-    self._run_validators()
-    self.save()
-```
-
-4. **Mettre à jour get() et set()**:
-```python
-def get(self) -> ParameterReturnType:
-    functions = {
+def get_proxy_class(value_type: str) -> type:
+    """Return the proxy class for a given value_type."""
+    from django_app_parameter.models import (
         # ... existants
-        self.TYPES.IPV: "ipv4",
+        ParameterIpv4,
+    )
+    mapping = {
+        # ... existants
+        TYPES.IPV: ParameterIpv4,
     }
-    # ...
-
-def set(self, value: ParameterAcceptType) -> None:
-    setters = {
-        # ... existants
-        self.TYPES.IPV: self.set_ipv4,
-    }
-    # ...
+    return mapping.get(value_type, Parameter)
 ```
 
-5. **Ajouter méthode au Manager**:
-```python
-class ParameterManager(models.Manager):
-    def ipv4(self, slug: str) -> _str:
-        return self.get_from_slug(slug).ipv4()
-```
-
-6. **Créer migration**:
+4. **Créer migration**:
 ```bash
-cd demo_project
 poetry run python manage.py makemigrations django_app_parameter
 ```
 
-7. **Ajouter champ dans admin.py**:
+5. **Ajouter champ dans admin.py**:
 ```python
 class ParameterEditForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # ... autres types
-        elif self.instance.value_type == Parameter.TYPES.IPV:
+        elif self.instance.value_type == TYPES.IPV:
             self.fields['value'] = forms.GenericIPAddressField(
                 protocol='IPv4',
-                initial=self.instance.ipv4()
+                initial=self.instance.get()
             )
 ```
 
-8. **Ajouter tests**:
+6. **Ajouter tests**:
 ```python
 # Dans tests/test_django_app_parameter.py
 def test_ipv4_parameter(db):
     param = Parameter.objects.create(
         name="Server IP",
-        value_type=Parameter.TYPES.IPV,
+        value_type=TYPES.IPV,
         value="192.168.1.1"
     )
-    assert param.ipv4() == "192.168.1.1"
     assert param.get() == "192.168.1.1"
 
 def test_set_ipv4(db):
     param = Parameter.objects.create(
         name="Server IP",
-        value_type=Parameter.TYPES.IPV,
+        value_type=TYPES.IPV,
         value="192.168.1.1"
     )
-    param.set_ipv4("10.0.0.1")
+    param.set("10.0.0.1")
     param.refresh_from_db()
     assert param.value == "10.0.0.1"
 
 def test_set_invalid_ipv4(db):
     param = Parameter.objects.create(
         name="Server IP",
-        value_type=Parameter.TYPES.IPV,
+        value_type=TYPES.IPV,
         value="192.168.1.1"
     )
-    with pytest.raises(ValidationError):
-        param.set_ipv4("999.999.999.999")
+    with pytest.raises(ParameterValueTypeError):
+        param.set("999.999.999.999")
 ```
 
 ### Ajouter un validateur personnalisé

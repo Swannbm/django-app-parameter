@@ -2,6 +2,7 @@ import json
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from pathlib import Path
+from typing import Any
 
 import pytest
 from django.core.exceptions import ImproperlyConfigured
@@ -9,7 +10,29 @@ from django.core.management import call_command
 
 from django_app_parameter import app_parameter
 from django_app_parameter.context_processors import add_global_parameter_context
-from django_app_parameter.models import Parameter, ParameterValidator
+from django_app_parameter.managers import get_proxy_class
+from django_app_parameter.models import (
+    TYPES,
+    Parameter,
+    ParameterBool,
+    ParameterDate,
+    ParameterDatetime,
+    ParameterDecimal,
+    ParameterDict,
+    ParameterDuration,
+    ParameterEmail,
+    ParameterFloat,
+    ParameterInt,
+    ParameterJson,
+    ParameterList,
+    ParameterPath,
+    ParameterPercentage,
+    ParameterStr,
+    ParameterTime,
+    ParameterUrl,
+    ParameterValidator,
+    ParameterValueTypeError,
+)
 
 
 @pytest.fixture
@@ -24,14 +47,14 @@ def params(db):
             name="year of birth",
             slug="BIRTH_YEAR",
             value="1983",
-            value_type=Parameter.TYPES.INT,
+            value_type=TYPES.INT,
             is_global=True,
         ),
         Parameter(
             name="a small json",
             slug="SM_JSON",
             value="[1, 2, 3]",
-            value_type=Parameter.TYPES.JSN,
+            value_type=TYPES.JSN,
         ),
     ]
     Parameter.objects.bulk_create(params)
@@ -41,7 +64,7 @@ def params(db):
 class TestParameter:
     @pytest.mark.django_db
     def test_default_slug(self):
-        param = Parameter(
+        param = ParameterStr(
             name="testing is good#",
             value="hello world",
         )
@@ -54,67 +77,80 @@ class TestParameter:
             slug="TESTING",
             value="hello world",
         )
-        assert param.value_type == Parameter.TYPES.STR
+        assert param.value_type == TYPES.STR
         assert isinstance(param.get(), str)
 
-    def test_str(self):
-        param = Parameter(
+    @pytest.mark.parametrize(
+        "proxy_class,value,expected_type,expected_value",
+        [
+            (ParameterStr, "1", str, "1"),
+            (ParameterInt, "1", int, 1),
+            (ParameterFloat, "0.1", float, 0.1),
+            (ParameterDecimal, "0.2", Decimal, Decimal("0.2")),
+            (ParameterBool, "True", bool, True),
+            (ParameterDate, "2024-03-15", date, date(2024, 3, 15)),
+            (
+                ParameterDatetime,
+                "2024-03-15T14:30:00",
+                datetime,
+                datetime(2024, 3, 15, 14, 30, 0),
+            ),
+            (ParameterTime, "14:30:00", time, time(14, 30, 0)),
+            (ParameterUrl, "https://example.com", str, "https://example.com"),
+            (ParameterEmail, "admin@example.com", str, "admin@example.com"),
+            (ParameterPath, "/media/uploads", Path, Path("/media/uploads")),
+            (ParameterDuration, "3600", timedelta, timedelta(seconds=3600)),
+            (ParameterDuration, "3600.5", timedelta, timedelta(seconds=3600.5)),
+            (ParameterPercentage, "75.5", float, 75.5),
+            (ParameterList, "item1,item2,item3", list, ["item1", "item2", "item3"]),
+            (ParameterList, "", list, []),
+            (
+                ParameterDict,
+                '{"key": "value", "count": 42}',
+                dict,
+                {"key": "value", "count": 42},
+            ),
+        ],
+    )
+    def test_typed_parameters(
+        self,
+        proxy_class: type[Parameter],
+        value: str,
+        expected_type: type,
+        expected_value: Any,
+    ) -> None:
+        param = proxy_class(
             name="testing",
             slug="TESTING",
-            value="1",
+            value=value,
         )
-        result = param.str()
-        assert isinstance(result, str)
-        assert result == "1"
-        assert isinstance(param.get(), str)
+        result = param.get()
+        assert isinstance(result, expected_type)
+        assert result == expected_value
 
-    def test_int(self):
-        param = Parameter(
+    def test_json(self):
+        param = ParameterJson(
             name="testing",
             slug="TESTING",
-            value="1",
-            value_type=Parameter.TYPES.INT,
+            value='{"hello": ["world", "testers"]}',
         )
-        result = param.int()
-        assert isinstance(result, int)
-        assert result == 1
-        assert isinstance(param.get(), int)
-
-    def test_float(self):
-        param = Parameter(
-            name="testing",
-            slug="TESTING",
-            value="0.1",
-            value_type=Parameter.TYPES.FLT,
-        )
-        result = param.float()
-        assert isinstance(result, float)
-        assert result == 0.1
-        assert isinstance(param.get(), float)
-
-    def test_decimal(self):
-        param = Parameter(
-            name="testing",
-            slug="TESTING",
-            value="0.2",
-            value_type=Parameter.TYPES.DCL,
-        )
-        result = param.decimal()
-        assert isinstance(result, Decimal)
-        assert result == Decimal("0.2")
-        assert isinstance(param.get(), Decimal)
-
-    def json(self):
-        param = Parameter(
-            name="testing",
-            slug="TESTING",
-            value="{'hello': ['world', 'testers']}",
-            value_type=Parameter.TYPES.JSN,
-        )
-        result = param.json()
+        result = param.get()
         assert isinstance(result, dict)
         assert result["hello"][1] == "testers"
-        assert isinstance(param.get(), dict)
+
+    def test_json_is_instance_not_serializable(self):
+        param = ParameterJson(name="testing")
+        assert not param._is_instance(
+            {"hello": ["world", datetime(2024, 6, 1, 12, 0, 0)]}
+        )
+
+    def test_url_is_instance_not_serializable(self):
+        param = ParameterUrl(name="testing")
+        assert not param._is_instance("blablabl")
+
+    def test_email_is_instance_not_serializable(self):
+        param = ParameterEmail(name="testing")
+        assert not param._is_instance("blablabl")
 
     def test_dundo_str(self):
         param = Parameter(
@@ -123,211 +159,41 @@ class TestParameter:
         )
         assert str(param) == "testing"
 
-    def test_bool(self):
-        param = Parameter(
+    @pytest.mark.parametrize(
+        "falsy_value",
+        ["False", "0", "false", "no", "OFF", "nO"],
+    )
+    def test_bool_falsy_values(self, falsy_value: str) -> None:
+        param = ParameterBool(
             name="testing",
             slug="TESTING",
-            value="True",
-            value_type=Parameter.TYPES.BOO,
+            value=falsy_value,
         )
-        result = param.bool()
-        assert isinstance(result, bool)
-        assert result is True
-        assert isinstance(param.get(), bool)
-        param.value = "False"  # type: ignore[assignment]
-        assert param.bool() is False
-        param.value = "0"  # type: ignore[assignment]
-        assert param.bool() is False
+        assert param.get() is False
 
-    def test_date(self):
-        param = Parameter(
+    @pytest.mark.parametrize(
+        "proxy_class,value,error_match",
+        [
+            (ParameterUrl, "not-a-valid-url", "Invalid URL"),
+            (ParameterEmail, "not-an-email", "Invalid email"),
+            (ParameterDict, "[1, 2, 3]", "Expected dict"),
+            (ParameterPercentage, "150", "must be between 0 and 100"),
+            (ParameterPercentage, "-10", "must be between 0 and 100"),
+        ],
+    )
+    def test_invalid_values(
+        self,
+        proxy_class: type[Parameter],
+        value: str,
+        error_match: str,
+    ) -> None:
+        param = proxy_class(
             name="testing",
             slug="TESTING",
-            value="2024-03-15",
-            value_type=Parameter.TYPES.DATE,
+            value=value,
         )
-        result = param.date()
-        assert isinstance(result, date)
-        assert result == date(2024, 3, 15)
-        assert isinstance(param.get(), date)
-
-    def test_datetime(self):
-        param = Parameter(
-            name="testing",
-            slug="TESTING",
-            value="2024-03-15T14:30:00",
-            value_type=Parameter.TYPES.DATETIME,
-        )
-        result = param.datetime()
-        assert isinstance(result, datetime)
-        assert result == datetime(2024, 3, 15, 14, 30, 0)
-        assert isinstance(param.get(), datetime)
-
-    def test_time(self):
-        param = Parameter(
-            name="testing",
-            slug="TESTING",
-            value="14:30:00",
-            value_type=Parameter.TYPES.TIME,
-        )
-        result = param.time()
-        assert isinstance(result, time)
-        assert result == time(14, 30, 0)
-        assert isinstance(param.get(), time)
-
-    def test_url(self):
-        param = Parameter(
-            name="testing",
-            slug="TESTING",
-            value="https://example.com/api",
-            value_type=Parameter.TYPES.URL,
-        )
-        result = param.url()
-        assert isinstance(result, str)
-        assert result == "https://example.com/api"
-        assert isinstance(param.get(), str)
-
-    def test_url_invalid(self):
-        param = Parameter(
-            name="testing",
-            slug="TESTING",
-            value="not-a-valid-url",
-            value_type=Parameter.TYPES.URL,
-        )
-        with pytest.raises(ValueError, match="Invalid URL"):
-            param.url()
-
-    def test_email(self):
-        param = Parameter(
-            name="testing",
-            slug="TESTING",
-            value="admin@example.com",
-            value_type=Parameter.TYPES.EMAIL,
-        )
-        result = param.email()
-        assert isinstance(result, str)
-        assert result == "admin@example.com"
-        assert isinstance(param.get(), str)
-
-    def test_email_invalid(self):
-        param = Parameter(
-            name="testing",
-            slug="TESTING",
-            value="not-an-email",
-            value_type=Parameter.TYPES.EMAIL,
-        )
-        with pytest.raises(ValueError, match="Invalid email"):
-            param.email()
-
-    def test_list(self):
-        param = Parameter(
-            name="testing",
-            slug="TESTING",
-            value="item1, item2, item3",
-            value_type=Parameter.TYPES.LIST,
-        )
-        result = param.list()
-        assert isinstance(result, list)
-        assert result == ["item1", "item2", "item3"]
-        assert isinstance(param.get(), list)
-
-    def test_list_empty(self):
-        param = Parameter(
-            name="testing",
-            slug="TESTING",
-            value="",
-            value_type=Parameter.TYPES.LIST,
-        )
-        result = param.list()
-        assert result == []
-
-    def test_dict(self):
-        param = Parameter(
-            name="testing",
-            slug="TESTING",
-            value='{"key": "value", "count": 42}',
-            value_type=Parameter.TYPES.DICT,
-        )
-        result = param.dict()
-        assert isinstance(result, dict)
-        assert result == {"key": "value", "count": 42}
-        assert isinstance(param.get(), dict)
-
-    def test_dict_invalid_not_dict(self):
-        param = Parameter(
-            name="testing",
-            slug="TESTING",
-            value="[1, 2, 3]",
-            value_type=Parameter.TYPES.DICT,
-        )
-        with pytest.raises(ValueError, match="Expected dict"):
-            param.dict()
-
-    def test_path(self):
-        param = Parameter(
-            name="testing",
-            slug="TESTING",
-            value="/media/uploads/documents",
-            value_type=Parameter.TYPES.PATH,
-        )
-        result = param.path()
-        assert isinstance(result, Path)
-        assert result == Path("/media/uploads/documents")
-        assert isinstance(param.get(), Path)
-
-    def test_duration(self):
-        param = Parameter(
-            name="testing",
-            slug="TESTING",
-            value="3600",
-            value_type=Parameter.TYPES.DURATION,
-        )
-        result = param.duration()
-        assert isinstance(result, timedelta)
-        assert result == timedelta(seconds=3600)
-        assert isinstance(param.get(), timedelta)
-
-    def test_duration_float(self):
-        param = Parameter(
-            name="testing",
-            slug="TESTING",
-            value="3600.5",
-            value_type=Parameter.TYPES.DURATION,
-        )
-        result = param.duration()
-        assert result == timedelta(seconds=3600.5)
-
-    def test_percentage(self):
-        param = Parameter(
-            name="testing",
-            slug="TESTING",
-            value="75.5",
-            value_type=Parameter.TYPES.PERCENTAGE,
-        )
-        result = param.percentage()
-        assert isinstance(result, float)
-        assert result == 75.5
-        assert isinstance(param.get(), float)
-
-    def test_percentage_invalid_too_high(self):
-        param = Parameter(
-            name="testing",
-            slug="TESTING",
-            value="150",
-            value_type=Parameter.TYPES.PERCENTAGE,
-        )
-        with pytest.raises(ValueError, match="must be between 0 and 100"):
-            param.percentage()
-
-    def test_percentage_invalid_negative(self):
-        param = Parameter(
-            name="testing",
-            slug="TESTING",
-            value="-10",
-            value_type=Parameter.TYPES.PERCENTAGE,
-        )
-        with pytest.raises(ValueError, match="must be between 0 and 100"):
-            param.percentage()
+        with pytest.raises(ValueError, match=error_match):
+            param.get()
 
     @pytest.mark.django_db
     def test_to_dict_basic(self):
@@ -336,7 +202,7 @@ class TestParameter:
             name="Test Param",
             slug="TEST_PARAM",
             value="test value",
-            value_type=Parameter.TYPES.STR,
+            value_type=TYPES.STR,
             description="Test description",
             is_global=True,
         )
@@ -346,7 +212,7 @@ class TestParameter:
         assert result["name"] == "Test Param"
         assert result["slug"] == "TEST_PARAM"
         assert result["value"] == "test value"
-        assert result["value_type"] == Parameter.TYPES.STR
+        assert result["value_type"] == TYPES.STR
         assert result["description"] == "Test description"
         assert result["is_global"] is True
         assert "validators" not in result
@@ -358,7 +224,7 @@ class TestParameter:
             name="Validated Param",
             slug="VALIDATED_PARAM",
             value="50",
-            value_type=Parameter.TYPES.INT,
+            value_type=TYPES.INT,
         )
         ParameterValidator.objects.create(
             parameter=param,
@@ -393,7 +259,7 @@ class TestParameter:
         assert result["name"] == "Minimal"
         assert result["slug"] == "MINIMAL"
         assert result["value"] == "value"
-        assert result["value_type"] == Parameter.TYPES.STR  # default
+        assert result["value_type"] == TYPES.STR  # default
         assert result["description"] == ""
         assert result["is_global"] is False
         assert "validators" not in result
@@ -406,7 +272,7 @@ class TestParameter:
             "name": "New Param",
             "slug": "NEW_PARAM",
             "value": "test value",
-            "value_type": Parameter.TYPES.STR,
+            "value_type": TYPES.STR,
             "description": "Test description",
             "is_global": True,
         }
@@ -416,7 +282,7 @@ class TestParameter:
         assert param.name == "New Param"
         assert param.slug == "NEW_PARAM"
         assert param.value == "test value"
-        assert param.value_type == Parameter.TYPES.STR
+        assert param.value_type == TYPES.STR
         assert param.description == "Test description"
         assert param.is_global is True
 
@@ -427,7 +293,7 @@ class TestParameter:
             name="Original Name",
             slug="ORIGINAL_SLUG",
             value="original value",
-            value_type=Parameter.TYPES.STR,
+            value_type=TYPES.STR,
             description="Original description",
             is_global=False,
         )
@@ -440,7 +306,7 @@ class TestParameter:
             "is_global": True,
             # slug and value_type should be ignored for existing instances
             "slug": "NEW_SLUG",
-            "value_type": Parameter.TYPES.INT,
+            "value_type": TYPES.INT,
         }
         param.from_dict(data)
 
@@ -451,7 +317,7 @@ class TestParameter:
         assert param.is_global is True
         # These should not change for existing instances
         assert param.slug == "ORIGINAL_SLUG"
-        assert param.value_type == Parameter.TYPES.STR
+        assert param.value_type == TYPES.STR
 
     @pytest.mark.django_db
     def test_from_dict_with_validators(self):
@@ -461,7 +327,7 @@ class TestParameter:
             "name": "Validated Param",
             "slug": "VALIDATED_PARAM",
             "value": "50",
-            "value_type": Parameter.TYPES.INT,
+            "value_type": TYPES.INT,
             "validators": [
                 {
                     "validator_type": "MinValueValidator",
@@ -489,7 +355,7 @@ class TestParameter:
             name="Test Param",
             slug="TEST_PARAM",
             value="50",
-            value_type=Parameter.TYPES.INT,
+            value_type=TYPES.INT,
         )
         # Add initial validators
         ParameterValidator.objects.create(
@@ -531,7 +397,7 @@ class TestParameter:
             name="Test Param",
             slug="TEST_PARAM",
             value="50",
-            value_type=Parameter.TYPES.INT,
+            value_type=TYPES.INT,
         )
         ParameterValidator.objects.create(
             parameter=param,
@@ -583,151 +449,107 @@ class TestParameterManager:
     def test_fixtures(self, params):
         assert Parameter.objects.all().count() == 3
 
-    def test_get_from_slug(self, params):
-        params = Parameter.objects.get_from_slug("BIRTH_YEAR")
-        assert params.int() == 1983
+    @pytest.mark.parametrize(
+        "type,expected_class",
+        [
+            (TYPES.INT, ParameterInt),
+            (TYPES.STR, ParameterStr),
+            (TYPES.FLT, ParameterFloat),
+            (TYPES.DCL, ParameterDecimal),
+            (TYPES.JSN, ParameterJson),
+            (TYPES.BOO, ParameterBool),
+            (TYPES.DATE, ParameterDate),
+            (TYPES.DATETIME, ParameterDatetime),
+            (TYPES.TIME, ParameterTime),
+            (TYPES.URL, ParameterUrl),
+            (TYPES.EMAIL, ParameterEmail),
+            (TYPES.LIST, ParameterList),
+            (TYPES.DICT, ParameterDict),
+            (TYPES.PATH, ParameterPath),
+            (TYPES.DURATION, ParameterDuration),
+            (TYPES.PERCENTAGE, ParameterPercentage),
+        ]
+    )
+    def test_get_proxy_class(self, type, expected_class):
+        assert get_proxy_class(type) == expected_class
+
+    def test_get_proxy_class_not_existing(self):
+        with pytest.raises(ImproperlyConfigured):
+            get_proxy_class("non_existing_type")
+
+    @pytest.mark.parametrize(
+        "type,expected_class,value,expected_value",
+        [
+            (TYPES.INT, ParameterInt, "1983", 1983),
+            (TYPES.STR, ParameterStr, "test", "test"),
+            (TYPES.FLT, ParameterFloat, "3.14", 3.14),
+            (TYPES.DCL, ParameterDecimal, "2.71", Decimal("2.71")),
+            (TYPES.JSN, ParameterJson, '{"key": "value"}', {"key": "value"}),
+            (TYPES.BOO, ParameterBool, "1", True),
+            (TYPES.DATE, ParameterDate, "2024-01-15", date(2024, 1, 15)),
+            (
+                TYPES.DATETIME,
+                ParameterDatetime,
+                "2024-01-15T10:30:00",
+                datetime(2024, 1, 15, 10, 30, 0),
+            ),
+            (TYPES.TIME, ParameterTime, "14:30:00", time(14, 30, 0)),
+            (TYPES.URL, ParameterUrl, "https://example.com", "https://example.com"),
+            (TYPES.EMAIL, ParameterEmail, "test@example.com", "test@example.com"),
+            (TYPES.LIST, ParameterList, "a, b, c", ["a", "b", "c"]),
+            (TYPES.DICT, ParameterDict, '{"key": "value"}', {"key": "value"}),
+            (TYPES.PATH, ParameterPath, "/path/to/file", Path("/path/to/file")),
+            (TYPES.DURATION, ParameterDuration, "3600", timedelta(seconds=3600)),
+            (TYPES.PERCENTAGE, ParameterPercentage, "50", 50.0),
+        ],
+    )
+    def test_use_correct_subclass(self, type, expected_class, value, expected_value):
+        Parameter.objects.create(
+            name="Test Param",
+            slug="TEST_PARAM",
+            value=value,
+            value_type=type,
+        )
+        param = Parameter.objects.get_from_slug("TEST_PARAM")
+        assert isinstance(param, expected_class)
+        assert param.get() == expected_value
+
+    @pytest.mark.parametrize(
+        "type,expected_class",
+        [
+            (TYPES.INT, ParameterInt),
+            (TYPES.STR, ParameterStr),
+            (TYPES.FLT, ParameterFloat),
+            (TYPES.DCL, ParameterDecimal),
+            (TYPES.JSN, ParameterJson),
+            (TYPES.BOO, ParameterBool),
+            (TYPES.DATE, ParameterDate),
+            (
+                TYPES.DATETIME,
+                ParameterDatetime,
+            ),
+            (TYPES.TIME, ParameterTime),
+            (TYPES.URL, ParameterUrl),
+            (TYPES.EMAIL, ParameterEmail),
+            (TYPES.LIST, ParameterList),
+            (TYPES.DICT, ParameterDict),
+            (TYPES.PATH, ParameterPath),
+            (TYPES.DURATION, ParameterDuration),
+            (TYPES.PERCENTAGE, ParameterPercentage),
+        ],
+    )
+    def test_create_correct_subclass(self, type, expected_class):
+        param = Parameter.objects.create(
+            name="Test Param",
+            slug="TEST_PARAM",
+            value="",
+            value_type=type,
+        )
+        assert isinstance(param, expected_class)
+
+    def test_get_from_slug_not_existing(self, params):
         with pytest.raises(ImproperlyConfigured):
             Parameter.objects.get_from_slug("NOT_EXISTING")
-
-    def test_access(self, params):
-        assert Parameter.objects.int("BIRTH_YEAR") == 1983
-        assert Parameter.objects.str("BIRTH_YEAR") == "1983"
-        assert Parameter.objects.float("BIRTH_YEAR") == float("1983")
-        assert Parameter.objects.decimal("BIRTH_YEAR") == Decimal("1983")
-        assert Parameter.objects.float("BIRTH_YEAR") == float("1983")
-        assert Parameter.objects.json("SM_JSON") == [1, 2, 3]
-
-    def test_manager_bool(self):
-        """Test Parameter.objects.bool() manager method"""
-        Parameter.objects.create(
-            name="Test Bool",
-            slug="TEST_BOOL",
-            value="1",
-            value_type=Parameter.TYPES.BOO,
-        )
-        result = Parameter.objects.bool("TEST_BOOL")
-        assert result is True
-        assert isinstance(result, bool)
-
-    def test_manager_date(self):
-        """Test Parameter.objects.date() manager method"""
-        Parameter.objects.create(
-            name="Test Date",
-            slug="TEST_DATE",
-            value="2024-01-15",
-            value_type=Parameter.TYPES.DATE,
-        )
-        result = Parameter.objects.date("TEST_DATE")
-        assert result == date(2024, 1, 15)
-        assert isinstance(result, date)
-
-    def test_manager_datetime(self):
-        """Test Parameter.objects.datetime() manager method"""
-        Parameter.objects.create(
-            name="Test DateTime",
-            slug="TEST_DATETIME",
-            value="2024-01-15T10:30:00",
-            value_type=Parameter.TYPES.DATETIME,
-        )
-        result = Parameter.objects.datetime("TEST_DATETIME")
-        assert result == datetime(2024, 1, 15, 10, 30, 0)
-        assert isinstance(result, datetime)
-
-    def test_manager_time(self):
-        """Test Parameter.objects.time() manager method"""
-        Parameter.objects.create(
-            name="Test Time",
-            slug="TEST_TIME",
-            value="14:30:00",
-            value_type=Parameter.TYPES.TIME,
-        )
-        result = Parameter.objects.time("TEST_TIME")
-        assert result == time(14, 30, 0)
-        assert isinstance(result, time)
-
-    def test_manager_url(self):
-        """Test Parameter.objects.url() manager method"""
-        Parameter.objects.create(
-            name="Test URL",
-            slug="TEST_URL",
-            value="https://example.com",
-            value_type=Parameter.TYPES.URL,
-        )
-        result = Parameter.objects.url("TEST_URL")
-        assert result == "https://example.com"
-        assert isinstance(result, str)
-
-    def test_manager_email(self):
-        """Test Parameter.objects.email() manager method"""
-        Parameter.objects.create(
-            name="Test Email",
-            slug="TEST_EMAIL",
-            value="test@example.com",
-            value_type=Parameter.TYPES.EMAIL,
-        )
-        result = Parameter.objects.email("TEST_EMAIL")
-        assert result == "test@example.com"
-        assert isinstance(result, str)
-
-    def test_manager_list(self):
-        """Test Parameter.objects.list() manager method"""
-        Parameter.objects.create(
-            name="Test List",
-            slug="TEST_LIST",
-            value="a, b, c",
-            value_type=Parameter.TYPES.LIST,
-        )
-        result = Parameter.objects.list("TEST_LIST")
-        assert result == ["a", "b", "c"]
-        assert isinstance(result, list)
-
-    def test_manager_dict(self):
-        """Test Parameter.objects.dict() manager method"""
-        Parameter.objects.create(
-            name="Test Dict",
-            slug="TEST_DICT",
-            value='{"key": "value"}',
-            value_type=Parameter.TYPES.DICT,
-        )
-        result = Parameter.objects.dict("TEST_DICT")
-        assert result == {"key": "value"}
-        assert isinstance(result, dict)
-
-    def test_manager_path(self):
-        """Test Parameter.objects.path() manager method"""
-        Parameter.objects.create(
-            name="Test Path",
-            slug="TEST_PATH",
-            value="/tmp/test.txt",
-            value_type=Parameter.TYPES.PATH,
-        )
-        result = Parameter.objects.path("TEST_PATH")
-        assert result == Path("/tmp/test.txt")
-        assert isinstance(result, Path)
-
-    def test_manager_duration(self):
-        """Test Parameter.objects.duration() manager method"""
-        Parameter.objects.create(
-            name="Test Duration",
-            slug="TEST_DURATION",
-            value="3600",
-            value_type=Parameter.TYPES.DURATION,
-        )
-        result = Parameter.objects.duration("TEST_DURATION")
-        assert result == timedelta(seconds=3600)
-        assert isinstance(result, timedelta)
-
-    def test_manager_percentage(self):
-        """Test Parameter.objects.percentage() manager method"""
-        Parameter.objects.create(
-            name="Test Percentage",
-            slug="TEST_PERCENTAGE",
-            value="75.5",
-            value_type=Parameter.TYPES.PERCENTAGE,
-        )
-        result = Parameter.objects.percentage("TEST_PERCENTAGE")
-        assert result == 75.5
-        assert isinstance(result, float)
 
 
 @pytest.mark.django_db
@@ -745,30 +567,30 @@ class TestLoadParamMC:
                     "slug": "A8B8C",
                     "name": "back on test",
                     "value": "yes",
-                    "value_type": Parameter.TYPES.INT,
+                    "value_type": TYPES.INT,
                 },
             ]
         )
         call_command("dap_load", json=data)
         param1 = Parameter.objects.get(slug="HELLO_ZE_WORLD")
-        assert param1.str() == "yes"
+        assert param1.get() == "yes"
         assert param1.name == "hello ze world"
         assert param1.is_global is True
         assert param1.description == "123"
         param2 = Parameter.objects.get(slug="A8B8C")
         assert param2.name == "back on test"
-        assert param2.value_type == Parameter.TYPES.INT
+        assert param2.value_type == TYPES.INT
 
     def test_file_options(self):
         call_command("dap_load", file="django_app_parameter/data_for_test.json")
         param1 = Parameter.objects.get(slug="HELLO_ZE_WORLD")
-        assert param1.str() == "yes"
+        assert param1.get() == "yes"
         assert param1.name == "hello ze world"
         assert param1.is_global is True
         assert param1.description == "123"
         param2 = Parameter.objects.get(slug="A8B8C")
         assert param2.name == "back on test"
-        assert param2.value_type == Parameter.TYPES.INT
+        assert param2.value_type == TYPES.INT
 
     def test_noupdate_options(self, params):
         kwargs = {
@@ -816,7 +638,7 @@ class TestLoadParamWithValidators:
                 {
                     "name": "Max Items",
                     "value": "50",
-                    "value_type": Parameter.TYPES.INT,
+                    "value_type": TYPES.INT,
                     "validators": [
                         {
                             "validator_type": "MinValueValidator",
@@ -842,7 +664,7 @@ class TestLoadParamWithValidators:
                 {
                     "name": "User Age",
                     "value": "25",
-                    "value_type": Parameter.TYPES.INT,
+                    "value_type": TYPES.INT,
                     "validators": [
                         {
                             "validator_type": "MinValueValidator",
@@ -874,7 +696,7 @@ class TestLoadParamWithValidators:
                 {
                     "name": "Even Number",
                     "value": "10",
-                    "value_type": Parameter.TYPES.INT,
+                    "value_type": TYPES.INT,
                     "validators": [
                         {
                             "validator_type": "even_number",
@@ -907,7 +729,7 @@ class TestLoadParamWithValidators:
                 {
                     "name": "Simple Param",
                     "value": "test",
-                    "value_type": Parameter.TYPES.STR,
+                    "value_type": TYPES.STR,
                 }
             ]
         )
@@ -923,7 +745,7 @@ class TestLoadParamWithValidators:
                 {
                     "name": "Empty Validators",
                     "value": "test",
-                    "value_type": Parameter.TYPES.STR,
+                    "value_type": TYPES.STR,
                     "validators": [],
                 }
             ]
@@ -941,7 +763,7 @@ class TestLoadParamWithValidators:
                 {
                     "name": "Max Size",
                     "value": "100",
-                    "value_type": Parameter.TYPES.INT,
+                    "value_type": TYPES.INT,
                     "validators": [
                         {
                             "validator_type": "MinValueValidator",
@@ -966,7 +788,7 @@ class TestLoadParamWithValidators:
                 {
                     "name": "Max Size",
                     "value": "200",
-                    "value_type": Parameter.TYPES.INT,
+                    "value_type": TYPES.INT,
                     "validators": [
                         {
                             "validator_type": "MaxValueValidator",
@@ -993,7 +815,7 @@ class TestLoadParamWithValidators:
                 {
                     "name": "With Validators",
                     "value": "50",
-                    "value_type": Parameter.TYPES.INT,
+                    "value_type": TYPES.INT,
                     "validators": [
                         {
                             "validator_type": "MinValueValidator",
@@ -1014,7 +836,7 @@ class TestLoadParamWithValidators:
                 {
                     "name": "With Validators",
                     "value": "100",
-                    "value_type": Parameter.TYPES.INT,
+                    "value_type": TYPES.INT,
                 }
             ]
         )
@@ -1031,7 +853,7 @@ class TestLoadParamWithValidators:
                 {
                     "name": "Email Field",
                     "value": "test@example.com",
-                    "value_type": Parameter.TYPES.STR,
+                    "value_type": TYPES.STR,
                     "validators": [
                         {
                             "validator_type": "EmailValidator",
@@ -1057,7 +879,7 @@ class TestLoadParamWithValidators:
                 {
                     "name": "Bad Validator",
                     "value": "50",
-                    "value_type": Parameter.TYPES.INT,
+                    "value_type": TYPES.INT,
                     "validators": [
                         {
                             "validator_params": {"limit_value": 10},
@@ -1080,7 +902,7 @@ class TestLoadParamWithValidators:
                 {
                     "name": "Growing Param",
                     "value": "100",
-                    "value_type": Parameter.TYPES.INT,
+                    "value_type": TYPES.INT,
                 }
             ]
         )
@@ -1095,7 +917,7 @@ class TestLoadParamWithValidators:
                 {
                     "name": "Growing Param",
                     "value": "100",
-                    "value_type": Parameter.TYPES.INT,
+                    "value_type": TYPES.INT,
                     "validators": [
                         {
                             "validator_type": "MinValueValidator",
@@ -1135,417 +957,104 @@ class TestContextProcessor:
 class TestParameterSetters:
     """Test all setter methods for Parameter model"""
 
-    def test_set_int(self):
+    @pytest.mark.parametrize(
+        "type,value_in,expected_value",
+        [
+            (TYPES.STR, "hello", "hello"),
+            (TYPES.INT, 42, "42"),
+            (TYPES.FLT, 3.14, "3.14"),
+            (TYPES.DCL, Decimal("2.71"), "2.71"),
+            (TYPES.JSN, {"key": "value"}, '{"key": "value"}'),
+            (TYPES.BOO, True, "1"),
+            (TYPES.BOO, False, "0"),
+            (TYPES.DATE, date(2024, 1, 15), "2024-01-15"),
+            (TYPES.DATETIME, datetime(2024, 1, 15, 10, 30, 0), "2024-01-15T10:30:00"),
+            (TYPES.TIME, time(14, 30, 0), "14:30:00"),
+            (TYPES.URL, "https://example.com", "https://example.com"),
+            (TYPES.EMAIL, "test@example.com", "test@example.com"),
+            (TYPES.LIST, ["a", "b", "c"], "a,b,c"),
+            (TYPES.LIST, [], ""),
+            (TYPES.DICT, {"key": "value"}, '{"key": "value"}'),
+            (TYPES.PATH, Path("/path/to/file"), "/path/to/file"),
+            (TYPES.DURATION, timedelta(seconds=3600), "3600.0"),
+            (TYPES.PERCENTAGE, 75.5, "75.5"),
+        ],
+    )
+    def test_set(self, type, value_in, expected_value):
+        param = Parameter.objects.create(
+            name="test",
+            value="0",
+            value_type=type,
+        )
+        # get correct proxy instance
+        param.set(value_in)
+        param.refresh_from_db()
+        assert param.value == expected_value
+
+    @pytest.mark.parametrize(
+        "type,value_in,expected_value",
+        [
+            (TYPES.STR, "hello", "hello"),
+            (TYPES.INT, 42, "42"),
+            (TYPES.FLT, 3.14, "3.14"),
+            (TYPES.DCL, Decimal("2.71"), "2.71"),
+            (TYPES.JSN, {"key": "value"}, '{"key": "value"}'),
+            (TYPES.BOO, True, "1"),
+            (TYPES.BOO, False, "0"),
+            (TYPES.DATE, date(2024, 1, 15), "2024-01-15"),
+            (TYPES.DATETIME, datetime(2024, 1, 15, 10, 30, 0), "2024-01-15T10:30:00"),
+            (TYPES.TIME, time(14, 30, 0), "14:30:00"),
+            (TYPES.URL, "https://example.com", "https://example.com"),
+            (TYPES.EMAIL, "test@example.com", "test@example.com"),
+            (TYPES.LIST, ["a", "b", "c"], "a,b,c"),
+            (TYPES.LIST, [], ""),
+            (TYPES.DICT, {"key": "value"}, '{"key": "value"}'),
+            (TYPES.PATH, Path("/path/to/file"), "/path/to/file"),
+            (TYPES.DURATION, timedelta(seconds=3600), "3600.0"),
+            (TYPES.PERCENTAGE, 75.5, "75.5"),
+        ],
+    )
+    def test_set_auto_cast(self, type, value_in, expected_value):
+        param = Parameter.objects.create(
+            name="test",
+            value="0",
+            value_type=type,
+        )
+        # get correct proxy instance
+        param.set(expected_value, auto_cast=True)
+        param.refresh_from_db()
+        assert param.value == expected_value
+
+    @pytest.mark.parametrize(
+        "type,incorrect_value",
+        [
+            (TYPES.STR, 42),
+            (TYPES.INT, "42"),
+            (TYPES.FLT, "3.14"),
+            (TYPES.DCL, "2.71"),
+            (TYPES.JSN, '{"key": "value"}'),
+            (TYPES.BOO, "True"),
+            (TYPES.BOO, "False"),
+            (TYPES.DATE, "2024-01-15"),
+            (TYPES.DATETIME, "2024-01-15T10:30:00"),
+            (TYPES.TIME, "14:30:00"),
+            (TYPES.URL, 42),
+            (TYPES.EMAIL, 42),
+            (TYPES.LIST, "a,b,c"),
+            (TYPES.DICT, '{"key": "value"}'),
+            (TYPES.PATH, "/path/to/file"),
+            (TYPES.DURATION, "3600.0"),
+            (TYPES.PERCENTAGE, "75.5"),
+        ],
+    )
+    def test_set_invalid_type(self, type, incorrect_value):
         param = Parameter.objects.create(
             name="test_int",
-            value="0",
-            value_type=Parameter.TYPES.INT,
+            value="",
+            value_type=type,
         )
-        param.set_int(42)
-        param.refresh_from_db()
-        assert param.value == "42"
-        assert param.int() == 42
-
-    def test_set_int_invalid_type(self):
-        param = Parameter.objects.create(
-            name="test_int",
-            value="0",
-            value_type=Parameter.TYPES.INT,
-        )
-        with pytest.raises(TypeError, match="Expected int"):
-            param.set_int("not_an_int")
-
-    def test_set_str(self):
-        param = Parameter.objects.create(
-            name="test_str",
-            value="old",
-            value_type=Parameter.TYPES.STR,
-        )
-        param.set_str("new value")
-        param.refresh_from_db()
-        assert param.value == "new value"
-        assert param.str() == "new value"
-
-    def test_set_str_invalid_type(self):
-        param = Parameter.objects.create(
-            name="test_str",
-            value="old",
-            value_type=Parameter.TYPES.STR,
-        )
-        with pytest.raises(TypeError, match="Expected str"):
-            param.set_str(123)
-
-    def test_set_float(self):
-        param = Parameter.objects.create(
-            name="test_float",
-            value="0.0",
-            value_type=Parameter.TYPES.FLT,
-        )
-        param.set_float(3.14)
-        param.refresh_from_db()
-        assert param.value == "3.14"
-        assert param.float() == 3.14
-
-    def test_set_float_invalid_type(self):
-        param = Parameter.objects.create(
-            name="test_float",
-            value="0.0",
-            value_type=Parameter.TYPES.FLT,
-        )
-        with pytest.raises(TypeError, match="Expected float"):
-            param.set_float("not_a_float")
-
-    def test_set_decimal(self):
-        param = Parameter.objects.create(
-            name="test_decimal",
-            value="0.0",
-            value_type=Parameter.TYPES.DCL,
-        )
-        param.set_decimal(Decimal("99.99"))
-        param.refresh_from_db()
-        assert param.value == "99.99"
-        assert param.decimal() == Decimal("99.99")
-
-    def test_set_bool(self):
-        param = Parameter.objects.create(
-            name="test_bool",
-            value="0",
-            value_type=Parameter.TYPES.BOO,
-        )
-        param.set_bool(True)
-        param.refresh_from_db()
-        assert param.value == "1"
-        assert param.bool() is True
-
-        param.set_bool(False)
-        param.refresh_from_db()
-        assert param.value == "0"
-        assert param.bool() is False
-
-    def test_set_date(self):
-        param = Parameter.objects.create(
-            name="test_date",
-            value="2024-01-01",
-            value_type=Parameter.TYPES.DATE,
-        )
-        new_date = date(2025, 12, 31)
-        param.set_date(new_date)
-        param.refresh_from_db()
-        assert param.value == "2025-12-31"
-        assert param.date() == new_date
-
-    def test_set_datetime(self):
-        param = Parameter.objects.create(
-            name="test_datetime",
-            value="2024-01-01T00:00:00",
-            value_type=Parameter.TYPES.DATETIME,
-        )
-        new_dt = datetime(2025, 12, 31, 23, 59, 59)
-        param.set_datetime(new_dt)
-        param.refresh_from_db()
-        assert param.value == "2025-12-31T23:59:59"
-        assert param.datetime() == new_dt
-
-    def test_set_time(self):
-        param = Parameter.objects.create(
-            name="test_time",
-            value="00:00:00",
-            value_type=Parameter.TYPES.TIME,
-        )
-        new_time = time(14, 30, 45)
-        param.set_time(new_time)
-        param.refresh_from_db()
-        assert param.value == "14:30:45"
-        assert param.time() == new_time
-
-    def test_set_url(self):
-        param = Parameter.objects.create(
-            name="test_url",
-            value="https://old.com",
-            value_type=Parameter.TYPES.URL,
-        )
-        param.set_url("https://new.example.com")
-        param.refresh_from_db()
-        assert param.value == "https://new.example.com"
-        assert param.url() == "https://new.example.com"
-
-    def test_set_url_invalid(self):
-        param = Parameter.objects.create(
-            name="test_url",
-            value="https://old.com",
-            value_type=Parameter.TYPES.URL,
-        )
-        with pytest.raises(ValueError, match="Invalid URL"):
-            param.set_url("not-a-valid-url")
-
-    def test_set_email(self):
-        param = Parameter.objects.create(
-            name="test_email",
-            value="old@example.com",
-            value_type=Parameter.TYPES.EMAIL,
-        )
-        param.set_email("new@example.com")
-        param.refresh_from_db()
-        assert param.value == "new@example.com"
-        assert param.email() == "new@example.com"
-
-    def test_set_email_invalid(self):
-        param = Parameter.objects.create(
-            name="test_email",
-            value="old@example.com",
-            value_type=Parameter.TYPES.EMAIL,
-        )
-        with pytest.raises(ValueError, match="Invalid email"):
-            param.set_email("not-an-email")
-
-    def test_set_list(self):
-        param = Parameter.objects.create(
-            name="test_list",
-            value="a, b, c",
-            value_type=Parameter.TYPES.LIST,
-        )
-        param.set_list(["x", "y", "z"])
-        param.refresh_from_db()
-        assert param.value == "x, y, z"
-        assert param.list() == ["x", "y", "z"]
-
-    def test_set_list_empty(self):
-        param = Parameter.objects.create(
-            name="test_list",
-            value="a, b",
-            value_type=Parameter.TYPES.LIST,
-        )
-        param.set_list([])
-        param.refresh_from_db()
-        assert param.value == ""
-        assert param.list() == []
-
-    def test_set_dict(self):
-        param = Parameter.objects.create(
-            name="test_dict",
-            value='{"old": "value"}',
-            value_type=Parameter.TYPES.DICT,
-        )
-        param.set_dict({"new": "data", "count": 42})
-        param.refresh_from_db()
-        result = param.dict()
-        assert result == {"new": "data", "count": 42}
-
-    def test_set_path(self):
-        param = Parameter.objects.create(
-            name="test_path",
-            value="/old/path",
-            value_type=Parameter.TYPES.PATH,
-        )
-        param.set_path(Path("/new/path/to/file"))
-        param.refresh_from_db()
-        assert param.value == "/new/path/to/file"
-        assert param.path() == Path("/new/path/to/file")
-
-    def test_set_duration(self):
-        param = Parameter.objects.create(
-            name="test_duration",
-            value="3600",
-            value_type=Parameter.TYPES.DURATION,
-        )
-        param.set_duration(timedelta(hours=2))
-        param.refresh_from_db()
-        assert param.value == "7200.0"
-        assert param.duration() == timedelta(hours=2)
-
-    def test_set_percentage(self):
-        param = Parameter.objects.create(
-            name="test_percentage",
-            value="50",
-            value_type=Parameter.TYPES.PERCENTAGE,
-        )
-        param.set_percentage(75.5)
-        param.refresh_from_db()
-        assert param.value == "75.5"
-        assert param.percentage() == 75.5
-
-    def test_set_percentage_invalid_too_high(self):
-        param = Parameter.objects.create(
-            name="test_percentage",
-            value="50",
-            value_type=Parameter.TYPES.PERCENTAGE,
-        )
-        with pytest.raises(ValueError, match="must be between 0 and 100"):
-            param.set_percentage(150)
-
-    def test_set_percentage_invalid_negative(self):
-        param = Parameter.objects.create(
-            name="test_percentage",
-            value="50",
-            value_type=Parameter.TYPES.PERCENTAGE,
-        )
-        with pytest.raises(ValueError, match="must be between 0 and 100"):
-            param.set_percentage(-10)
-
-    def test_set_generic_int(self):
-        """Test generic set() method with INT type"""
-        param = Parameter.objects.create(
-            name="test_generic",
-            value="0",
-            value_type=Parameter.TYPES.INT,
-        )
-        param.set(999)
-        param.refresh_from_db()
-        assert param.int() == 999
-
-    def test_set_generic_str(self):
-        """Test generic set() method with STR type"""
-        param = Parameter.objects.create(
-            name="test_generic",
-            value="old",
-            value_type=Parameter.TYPES.STR,
-        )
-        param.set("new string")
-        param.refresh_from_db()
-        assert param.str() == "new string"
-
-    def test_set_generic_bool(self):
-        """Test generic set() method with BOOL type"""
-        param = Parameter.objects.create(
-            name="test_generic",
-            value="0",
-            value_type=Parameter.TYPES.BOO,
-        )
-        param.set(True)
-        param.refresh_from_db()
-        assert param.bool() is True
-
-    def test_set_json(self):
-        """Test set_json with complex objects"""
-        param = Parameter.objects.create(
-            name="test_json",
-            value="{}",
-            value_type=Parameter.TYPES.JSN,
-        )
-        data = {"users": [{"name": "Alice"}, {"name": "Bob"}], "count": 2}
-        param.set_json(data)
-        param.refresh_from_db()
-        assert param.json() == data
-
-    def test_set_decimal_invalid_type(self):
-        """Test set_decimal with invalid type"""
-        param = Parameter.objects.create(
-            name="test_decimal",
-            value="0.0",
-            value_type=Parameter.TYPES.DCL,
-        )
-        with pytest.raises(TypeError, match="Expected Decimal"):
-            param.set_decimal(99.99)  # float instead of Decimal
-
-    def test_set_bool_invalid_type(self):
-        """Test set_bool with invalid type"""
-        param = Parameter.objects.create(
-            name="test_bool",
-            value="0",
-            value_type=Parameter.TYPES.BOO,
-        )
-        with pytest.raises(TypeError, match="Expected bool"):
-            param.set_bool("true")  # string instead of bool
-
-    def test_set_date_invalid_type(self):
-        """Test set_date with invalid type"""
-        param = Parameter.objects.create(
-            name="test_date",
-            value="2024-01-01",
-            value_type=Parameter.TYPES.DATE,
-        )
-        with pytest.raises(TypeError, match="Expected date"):
-            param.set_date("2024-01-01")  # string instead of date
-
-    def test_set_datetime_invalid_type(self):
-        """Test set_datetime with invalid type"""
-        param = Parameter.objects.create(
-            name="test_datetime",
-            value="2024-01-01T00:00:00",
-            value_type=Parameter.TYPES.DATETIME,
-        )
-        with pytest.raises(TypeError, match="Expected datetime"):
-            param.set_datetime("2024-01-01T00:00:00")  # string instead of datetime
-
-    def test_set_time_invalid_type(self):
-        """Test set_time with invalid type"""
-        param = Parameter.objects.create(
-            name="test_time",
-            value="00:00:00",
-            value_type=Parameter.TYPES.TIME,
-        )
-        with pytest.raises(TypeError, match="Expected time"):
-            param.set_time("14:30:00")  # string instead of time
-
-    def test_set_url_invalid_type(self):
-        """Test set_url with invalid type"""
-        param = Parameter.objects.create(
-            name="test_url",
-            value="https://old.com",
-            value_type=Parameter.TYPES.URL,
-        )
-        with pytest.raises(TypeError, match="Expected str"):
-            param.set_url(123)  # int instead of str
-
-    def test_set_email_invalid_type(self):
-        """Test set_email with invalid type"""
-        param = Parameter.objects.create(
-            name="test_email",
-            value="old@example.com",
-            value_type=Parameter.TYPES.EMAIL,
-        )
-        with pytest.raises(TypeError, match="Expected str"):
-            param.set_email(["not", "an", "email"])  # list instead of str
-
-    def test_set_list_invalid_type(self):
-        """Test set_list with invalid type"""
-        param = Parameter.objects.create(
-            name="test_list",
-            value="a, b, c",
-            value_type=Parameter.TYPES.LIST,
-        )
-        with pytest.raises(TypeError, match="Expected list"):
-            param.set_list("a, b, c")  # string instead of list
-
-    def test_set_dict_invalid_type(self):
-        """Test set_dict with invalid type"""
-        param = Parameter.objects.create(
-            name="test_dict",
-            value='{"old": "value"}',
-            value_type=Parameter.TYPES.DICT,
-        )
-        with pytest.raises(TypeError, match="Expected dict"):
-            param.set_dict("not a dict")  # string instead of dict
-
-    def test_set_path_invalid_type(self):
-        """Test set_path with invalid type"""
-        param = Parameter.objects.create(
-            name="test_path",
-            value="/old/path",
-            value_type=Parameter.TYPES.PATH,
-        )
-        with pytest.raises(TypeError, match="Expected Path"):
-            param.set_path("/new/path")  # string instead of Path
-
-    def test_set_duration_invalid_type(self):
-        """Test set_duration with invalid type"""
-        param = Parameter.objects.create(
-            name="test_duration",
-            value="3600",
-            value_type=Parameter.TYPES.DURATION,
-        )
-        with pytest.raises(TypeError, match="Expected timedelta"):
-            param.set_duration(3600)  # int instead of timedelta
-
-    def test_set_percentage_invalid_type(self):
-        """Test set_percentage with invalid type"""
-        param = Parameter.objects.create(
-            name="test_percentage",
-            value="50",
-            value_type=Parameter.TYPES.PERCENTAGE,
-        )
-        with pytest.raises(TypeError, match="Expected float or int"):
-            param.set_percentage("75.5")  # string instead of float/int
+        with pytest.raises(ParameterValueTypeError):
+            param.set(incorrect_value)
 
 
 @pytest.mark.django_db
@@ -1556,7 +1065,7 @@ class TestParameterValidator:
         param = Parameter.objects.create(
             name="test_age",
             value="25",
-            value_type=Parameter.TYPES.INT,
+            value_type=TYPES.INT,
         )
         validator = ParameterValidator.objects.create(
             parameter=param,
@@ -1570,7 +1079,7 @@ class TestParameterValidator:
         param = Parameter.objects.create(
             name="test_age",
             value="25",
-            value_type=Parameter.TYPES.INT,
+            value_type=TYPES.INT,
         )
         ParameterValidator.objects.create(
             parameter=param,
@@ -1579,7 +1088,7 @@ class TestParameterValidator:
         )
         # Should work
         param.set(30)
-        assert param.int() == 30
+        assert param.get() == 30
 
         # Should fail
         from django.core.exceptions import ValidationError
@@ -1591,7 +1100,7 @@ class TestParameterValidator:
         param = Parameter.objects.create(
             name="test_age",
             value="25",
-            value_type=Parameter.TYPES.INT,
+            value_type=TYPES.INT,
         )
         ParameterValidator.objects.create(
             parameter=param,
@@ -1600,7 +1109,7 @@ class TestParameterValidator:
         )
         # Should work
         param.set(50)
-        assert param.int() == 50
+        assert param.get() == 50
 
         # Should fail
         from django.core.exceptions import ValidationError
@@ -1613,7 +1122,7 @@ class TestParameterValidator:
         param = Parameter.objects.create(
             name="test_score",
             value="50",
-            value_type=Parameter.TYPES.INT,
+            value_type=TYPES.INT,
         )
         ParameterValidator.objects.create(
             parameter=param,
@@ -1628,7 +1137,7 @@ class TestParameterValidator:
 
         # Should work
         param.set(75)
-        assert param.int() == 75
+        assert param.get() == 75
 
         # Should fail - too low
         from django.core.exceptions import ValidationError
@@ -1644,7 +1153,7 @@ class TestParameterValidator:
         param = Parameter.objects.create(
             name="test_username",
             value="john",
-            value_type=Parameter.TYPES.STR,
+            value_type=TYPES.STR,
         )
         ParameterValidator.objects.create(
             parameter=param,
@@ -1654,7 +1163,7 @@ class TestParameterValidator:
 
         # Should work
         param.set("alice")
-        assert param.str() == "alice"
+        assert param.get() == "alice"
 
         # Should fail
         from django.core.exceptions import ValidationError
@@ -1666,7 +1175,7 @@ class TestParameterValidator:
         param = Parameter.objects.create(
             name="test_code",
             value="ABC",
-            value_type=Parameter.TYPES.STR,
+            value_type=TYPES.STR,
         )
         ParameterValidator.objects.create(
             parameter=param,
@@ -1676,7 +1185,7 @@ class TestParameterValidator:
 
         # Should work
         param.set("SHORT")
-        assert param.str() == "SHORT"
+        assert param.get() == "SHORT"
 
         # Should fail
         from django.core.exceptions import ValidationError
@@ -1688,7 +1197,7 @@ class TestParameterValidator:
         param = Parameter.objects.create(
             name="test_pattern",
             value="ABC123",
-            value_type=Parameter.TYPES.STR,
+            value_type=TYPES.STR,
         )
         ParameterValidator.objects.create(
             parameter=param,
@@ -1698,7 +1207,7 @@ class TestParameterValidator:
 
         # Should work
         param.set("XYZ789")
-        assert param.str() == "XYZ789"
+        assert param.get() == "XYZ789"
 
         # Should fail
         from django.core.exceptions import ValidationError
@@ -1711,7 +1220,7 @@ class TestParameterValidator:
         param = Parameter.objects.create(
             name="test",
             value="10",
-            value_type=Parameter.TYPES.INT,
+            value_type=TYPES.INT,
         )
         param_validator = ParameterValidator.objects.create(
             parameter=param,
@@ -1734,7 +1243,7 @@ class TestParameterValidator:
         param = Parameter.objects.create(
             name="test_param",
             value="10",
-            value_type=Parameter.TYPES.INT,
+            value_type=TYPES.INT,
         )
         validator = ParameterValidator.objects.create(
             parameter=param,
@@ -1753,7 +1262,7 @@ class TestCustomValidators:
         param = Parameter.objects.create(
             name="test_even",
             value="4",
-            value_type=Parameter.TYPES.INT,
+            value_type=TYPES.INT,
         )
         ParameterValidator.objects.create(
             parameter=param,
@@ -1762,7 +1271,7 @@ class TestCustomValidators:
 
         # Should work with even numbers
         param.set(6)
-        assert param.int() == 6
+        assert param.get() == 6
 
         # Should fail with odd numbers
         from django.core.exceptions import ValidationError
@@ -1775,7 +1284,7 @@ class TestCustomValidators:
         param = Parameter.objects.create(
             name="test_range",
             value="50",
-            value_type=Parameter.TYPES.INT,
+            value_type=TYPES.INT,
         )
         ParameterValidator.objects.create(
             parameter=param,
@@ -1785,7 +1294,7 @@ class TestCustomValidators:
 
         # Should work within range
         param.set(75)
-        assert param.int() == 75
+        assert param.get() == 75
 
         # Should fail outside range
         from django.core.exceptions import ValidationError
@@ -1913,7 +1422,7 @@ class TestCustomValidators:
         param = Parameter.objects.create(
             name="test_unknown",
             value="10",
-            value_type=Parameter.TYPES.INT,
+            value_type=TYPES.INT,
         )
         validator = ParameterValidator.objects.create(
             parameter=param,
@@ -1928,7 +1437,7 @@ class TestCustomValidators:
         param = Parameter.objects.create(
             name="test_positive",
             value="5",
-            value_type=Parameter.TYPES.INT,
+            value_type=TYPES.INT,
         )
         ParameterValidator.objects.create(
             parameter=param,
@@ -1937,7 +1446,7 @@ class TestCustomValidators:
 
         # Should work with positive numbers
         param.set(10)
-        assert param.int() == 10
+        assert param.get() == 10
 
         # Should fail with zero or negative
         from django.core.exceptions import ValidationError
