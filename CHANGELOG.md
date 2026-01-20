@@ -2,7 +2,26 @@
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## [Unreleased]
+## [3.0.0] - 2026.01.20
+
+### Changed
+* **Breaking:** Simplified API - replaced type-specific methods with unified `get()` and `set()`:
+  * `param.int()`, `param.str()`, `param.bool()`, etc. → `param.get()`
+  * `param.set_int()`, `param.set_str()`, `param.set_bool()`, etc. → `param.set(value)`
+  * `Parameter.objects.int("SLUG")`, `Parameter.objects.str("SLUG")`, etc. → `Parameter.objects.get(slug="SLUG").get()`
+* Refactored to proxy model architecture: each parameter type now has its own proxy class (ParameterInt, ParameterStr, ParameterBool, etc.) with type-specific conversion logic
+* **manager** automatically returns the correct proxy class based on `value_type`
+
+### Added
+* `auto_cast` parameter on `set()` method to automatically convert string input to the parameter's native type before validation
+  ```python
+  param.set("42", auto_cast=True)  # Converts "42" to int for INT parameters
+  param.set("19.6", auto_cast=True)  # Converts "19.6" to Decimal for DCL parameters
+  ```
+* ParameterValueTypeError exception for type validation errors in set()
+
+
+###
 
 ## [2.1.3] - 2025.11.15
 
