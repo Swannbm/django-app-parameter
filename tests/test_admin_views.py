@@ -39,7 +39,7 @@ def sample_parameter(db):
     )
 
 
-@pytest.mark.django_db
+@pytest.mark.django_db(transaction=True)
 class TestParameterAdminCRUD:
     """Critical CRUD operations tests"""
 
@@ -91,8 +91,7 @@ class TestParameterAdminCRUD:
         """Test deleting a parameter through admin"""
         param_id = sample_parameter.pk
         url = reverse("admin:django_app_parameter_parameter_delete", args=[param_id])
-        data = {"post": "yes"}
-        response = admin_client.post(url, data, follow=True)
+        response = admin_client.post(url, {"post": "yes"}, follow=True)
 
         assert response.status_code == 200
         assert not Parameter.objects.filter(pk=param_id).exists()

@@ -6,14 +6,11 @@ Arguments:
 
 import json
 import logging
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 from django.core.management.base import BaseCommand, CommandParser
 
 from django_app_parameter.models import Parameter
-
-if TYPE_CHECKING:
-    from django_app_parameter.models import ParameterManager
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +39,7 @@ class Command(BaseCommand):
 
         # Get all parameters as JSON
         if TYPE_CHECKING:
-            manager = cast("ParameterManager", Parameter.objects)
+            manager = Parameter.objects
             data = manager.dump_to_json()
         else:
             data = Parameter.objects.dump_to_json()  # type: ignore[attr-defined]
