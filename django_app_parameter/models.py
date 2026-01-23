@@ -56,6 +56,10 @@ class Parameter(models.Model):
     and value history tracking.
 
     The default value type is STR (string).
+
+    ..todo::
+        - Add validate_value methode to validate without setting value
+        - add form field support
     """
 
     objects: ParameterManager = ParameterManager()  # pyright: ignore[reportIncompatibleVariableOverride]
