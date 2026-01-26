@@ -33,17 +33,6 @@ from django_app_parameter.utils import (
 logger = logging.getLogger(__name__)
 
 
-# Type aliasing because there is method name conflict
-_str = str
-_list = list
-_dict = dict
-_float = float
-_int = int
-_bool = bool
-_datetime = datetime_type
-_time = time_type
-
-
 class ParameterValueTypeError(BaseException):
     """Raised when a parameter value is of incorrect type"""
 
@@ -91,8 +80,8 @@ class Parameter(models.Model):
     @classmethod
     def from_db(
         cls,
-        db: _str | None,
-        field_names: Collection[_str],
+        db: str | None,
+        field_names: Collection[str],
         values: Collection[Any],
     ) -> Parameter:
         """Create instance from database row and convert to appropriate proxy class.
@@ -103,8 +92,8 @@ class Parameter(models.Model):
         """
         instance = super().from_db(db, field_names, values)
         # Get value_type from the loaded values
-        field_names_list = _list(field_names)
-        values_list = _list(values)
+        field_names_list = list(field_names)
+        values_list = list(values)
         if "value_type" in field_names_list:
             value_type_idx = field_names_list.index("value_type")
             value_type = values_list[value_type_idx]
@@ -113,7 +102,7 @@ class Parameter(models.Model):
                 instance.__class__ = proxy_class  # type: ignore[assignment]
         return instance
 
-    def _cast_from_str(self, value: _str) -> Any:
+    def _cast_from_str(self, value: str) -> Any:
         """Convert a string value to the parameter's native type.
 
         Args:
@@ -122,9 +111,9 @@ class Parameter(models.Model):
         Returns:
             The value converted to the parameter's native type.
         """
-        return _str(value)
+        return str(value)
 
-    def _cast_to_str(self, value: Any) -> _str:
+    def _cast_to_str(self, value: Any) -> str:
         """Convert a native type value to string for storage.
 
         Args:
@@ -134,7 +123,7 @@ class Parameter(models.Model):
             The string representation for database storage.
 
         """
-        return _str(value).strip()
+        return str(value).strip()
 
     def _is_instance(self, value: Any) -> bool:
         """Check if a value is of the expected native type.
@@ -146,11 +135,11 @@ class Parameter(models.Model):
             True if value is of the expected type, False otherwise.
 
         """
-        return isinstance(value, _str)
+        return isinstance(value, str)
 
-    type: _str = TYPES.STR
+    type: str = TYPES.STR
 
-    def get_type(self) -> _str:
+    def get_type(self) -> str:
         """Return the TYPES value for this parameter.
 
         Returns:
@@ -168,7 +157,7 @@ class Parameter(models.Model):
             self.slug = parameter_slugify(self.name)
         super().save(*args, **kwargs)
 
-    def _get_decrypted_value(self, value: _str) -> _str:
+    def _get_decrypted_value(self, value: str) -> str:
         """Decrypt value if encryption is enabled, otherwise return as-is."""
         if self.enable_cypher:
             return decrypt_value(value)
@@ -355,7 +344,7 @@ class Parameter(models.Model):
                 validator_params=validator_params,
             )
 
-    def __str__(self) -> _str:
+    def __str__(self) -> str:
         """Return the parameter name as string representation."""
         return self.name
 
@@ -417,13 +406,13 @@ class ParameterValidator(models.Model):
             return cast(Callable[[Any], None], validator_class)
 
         # Class-based validators need instantiation with params
-        params: _dict[_str, Any] = cast(
-            _dict[_str, Any],
+        params: dict[str, Any] = cast(
+            dict[str, Any],
             self.validator_params,  # type: ignore[arg-type]
         )
         return cast(Callable[[Any], None], validator_class(**params))
 
-    def __str__(self) -> _str:
+    def __str__(self) -> str:
         """Return parameter name and validator display name."""
         available = get_available_validators()
         display_name = available.get(self.validator_type, self.validator_type)
@@ -454,7 +443,7 @@ class ParameterHistory(models.Model):
         verbose_name_plural = "Historiques de paramètres"
         ordering = ["-modified_at"]
 
-    def __str__(self) -> _str:
+    def __str__(self) -> str:
         """Return value and modification timestamp."""
         return f"{self.value} - {self.modified_at.strftime('%Y-%m-%d %H:%M:%S')}"
 
@@ -472,13 +461,13 @@ class ParameterInt(Parameter):
     class Meta:
         proxy = True
 
-    def _cast_from_str(self, value: _str) -> int:
+    def _cast_from_str(self, value: str) -> int:
         """Convert string to integer."""
         return int(value)
 
-    def _cast_to_str(self, value: int) -> _str:
+    def _cast_to_str(self, value: int) -> str:
         """Convert integer to string."""
-        return _str(value)
+        return str(value)
 
     def _is_instance(self, value: Any) -> bool:
         """Check if value is an integer."""
@@ -500,9 +489,9 @@ class ParameterFloat(Parameter):
     class Meta:
         proxy = True
 
-    def _cast_from_str(self, value: _str) -> _float:
+    def _cast_from_str(self, value: str) -> float:
         """Convert string to float."""
-        return _float(value)
+        return float(value)
 
     def _is_instance(self, value: Any) -> bool:
         """Check if value is a float."""
@@ -517,7 +506,7 @@ class ParameterDecimal(Parameter):
     class Meta:
         proxy = True
 
-    def _cast_from_str(self, value: _str) -> Decimal:
+    def _cast_from_str(self, value: str) -> Decimal:
         """Convert string to Decimal."""
         return Decimal(value)
 
@@ -534,11 +523,11 @@ class ParameterJson(Parameter):
     class Meta:
         proxy = True
 
-    def _cast_from_str(self, value: _str) -> Any:
+    def _cast_from_str(self, value: str) -> Any:
         """Parse JSON string to Python object."""
         return json.loads(value)
 
-    def _cast_to_str(self, value: Any) -> _str:
+    def _cast_to_str(self, value: Any) -> str:
         """Serialize Python object to JSON string."""
         return json.dumps(value)
 
@@ -563,13 +552,13 @@ class ParameterBool(Parameter):
     class Meta:
         proxy = True
 
-    def _cast_from_str(self, value: _str) -> _bool:
+    def _cast_from_str(self, value: str) -> bool:
         """Convert string to boolean. Empty, 'false', '0' are False."""
         if not value or value.lower() in self.FALSY_VALUES:
             return False
         return True
 
-    def _cast_to_str(self, value: _bool) -> _str:
+    def _cast_to_str(self, value: bool) -> str:
         """Convert boolean to '1' or '0'."""
         return "1" if value else "0"
 
@@ -586,11 +575,11 @@ class ParameterDate(Parameter):
     class Meta:
         proxy = True
 
-    def _cast_from_str(self, value: _str) -> date_type:
+    def _cast_from_str(self, value: str) -> date_type:
         """Parse ISO format string (YYYY-MM-DD) to date."""
         return datetime_type.fromisoformat(value.strip()).date()
 
-    def _cast_to_str(self, value: date_type) -> _str:
+    def _cast_to_str(self, value: date_type) -> str:
         """Convert date to ISO format string."""
         return value.isoformat()
 
@@ -607,11 +596,11 @@ class ParameterDatetime(Parameter):
     class Meta:
         proxy = True
 
-    def _cast_from_str(self, value: _str) -> _datetime:
+    def _cast_from_str(self, value: str) -> datetime_type:
         """Parse ISO 8601 format string to datetime."""
-        return _datetime.fromisoformat(value.strip())
+        return datetime_type.fromisoformat(value.strip())
 
-    def _cast_to_str(self, value: _datetime) -> _str:
+    def _cast_to_str(self, value: datetime_type) -> str:
         """Convert datetime to ISO 8601 format string."""
         return value.isoformat()
 
@@ -628,13 +617,13 @@ class ParameterTime(Parameter):
     class Meta:
         proxy = True
 
-    def _cast_from_str(self, value: _str) -> _time:
+    def _cast_from_str(self, value: str) -> time_type:
         """Parse HH:MM:SS format string to time."""
-        if isinstance(value, _time):
+        if isinstance(value, time_type):
             return value
-        return _datetime.strptime(value.strip(), "%H:%M:%S").time()
+        return datetime_type.strptime(value.strip(), "%H:%M:%S").time()
 
-    def _cast_to_str(self, value: _time) -> _str:
+    def _cast_to_str(self, value: time_type) -> str:
         """Convert time to HH:MM:SS format string."""
         return value.strftime("%H:%M:%S")
 
@@ -651,7 +640,7 @@ class ParameterUrl(Parameter):
     class Meta:
         proxy = True
 
-    def _cast_from_str(self, value: _str) -> _str:
+    def _cast_from_str(self, value: str) -> str:
         """Validate and return URL string."""
         url_value = value.strip()
         validator = URLValidator()
@@ -681,7 +670,7 @@ class ParameterEmail(Parameter):
     class Meta:
         proxy = True
 
-    def _cast_from_str(self, value: _str) -> _str:
+    def _cast_from_str(self, value: str) -> str:
         """Validate and return email string."""
         email_value = value.strip()
         try:
@@ -709,16 +698,16 @@ class ParameterList(Parameter):
     class Meta:
         proxy = True
 
-    def _cast_from_str(self, value: _str) -> _list[_str]:
+    def _cast_from_str(self, value: str) -> list[str]:
         """Split comma-separated string into list of strings."""
         value_str = value.strip()
         if not value_str:
             return []
         return [item.strip() for item in value_str.split(",")]
 
-    def _cast_to_str(self, value: _list[Any]) -> _str:
+    def _cast_to_str(self, value: list[Any]) -> str:
         """Join list items with comma separator."""
-        return ",".join(_str(item) for item in value)
+        return ",".join(str(item) for item in value)
 
     def _is_instance(self, value: Any) -> bool:
         """Check if value is a list."""
@@ -733,14 +722,14 @@ class ParameterDict(Parameter):
     class Meta:
         proxy = True
 
-    def _cast_from_str(self, value: _str) -> _dict[_str, Any]:
+    def _cast_from_str(self, value: str) -> dict[str, Any]:
         """Parse JSON string to dict."""
         result = json.loads(value)
-        if not isinstance(result, _dict):
+        if not isinstance(result, dict):
             raise ValueError(f"Expected dict, got {type(result).__name__}")
         return result  # type: ignore[return-value]
 
-    def _cast_to_str(self, value: _dict[_str, Any]) -> _str:
+    def _cast_to_str(self, value: dict[str, Any]) -> str:
         """Serialize dict to JSON string."""
         return json.dumps(value)
 
@@ -757,7 +746,7 @@ class ParameterPath(Parameter):
     class Meta:
         proxy = True
 
-    def _cast_from_str(self, value: _str) -> Path:
+    def _cast_from_str(self, value: str) -> Path:
         """Convert string to Path object."""
         return Path(value.strip())
 
@@ -774,14 +763,14 @@ class ParameterDuration(Parameter):
     class Meta:
         proxy = True
 
-    def _cast_from_str(self, value: _str) -> timedelta:
+    def _cast_from_str(self, value: str) -> timedelta:
         """Convert seconds string to timedelta."""
-        seconds = _float(value)
+        seconds = float(value)
         return timedelta(seconds=seconds)
 
-    def _cast_to_str(self, value: timedelta) -> _str:
+    def _cast_to_str(self, value: timedelta) -> str:
         """Convert timedelta to total seconds string."""
-        return _str(value.total_seconds())
+        return str(value.total_seconds())
 
     def _is_instance(self, value: Any) -> bool:
         """Check if value is a timedelta."""
@@ -796,9 +785,9 @@ class ParameterPercentage(Parameter):
     class Meta:
         proxy = True
 
-    def _cast_from_str(self, value: _str) -> _float:
+    def _cast_from_str(self, value: str) -> float:
         """Convert string to float, validating range 0-100."""
-        result = _float(value)
+        result = float(value)
         if not 0 <= result <= 100:
             raise ValueError(f"Percentage must be between 0 and 100, got {result}")
         return result
