@@ -82,6 +82,7 @@ Documentation
 
    README
    usage-guide
+   forms
    management-commands
    faq
 
