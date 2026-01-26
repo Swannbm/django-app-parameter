@@ -2,6 +2,17 @@
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [3.2.0] - 2026.01.26
+
+### Added
+* **forms.py** you can now use create_parameter_field() to get a field that represent the parameter value.
+
+### Changed
+* **admin.py** refactoring using new forms.create_parameter_field()
+
+### Fixed
+* several minor bug fixing
+
 ## [3.1.0] - 2026.01.26
 
 ### Changed:
