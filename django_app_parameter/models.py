@@ -630,6 +630,8 @@ class ParameterTime(Parameter):
 
     def _cast_from_str(self, value: _str) -> _time:
         """Parse HH:MM:SS format string to time."""
+        if isinstance(value, _time):
+            return value
         return _datetime.strptime(value.strip(), "%H:%M:%S").time()
 
     def _cast_to_str(self, value: _time) -> _str:
