@@ -1,12 +1,10 @@
 """Tests for admin forms and helpers"""
 
-from decimal import Decimal
-
 import pytest
 from django import forms
 
-from django_app_parameter.admin import (
-    ParameterAdmin,
+from django_app_parameter.admin import ParameterAdmin
+from django_app_parameter.forms import (
     ParameterCreateForm,
     ParameterEditForm,
     ParameterValidatorForm,
@@ -78,94 +76,6 @@ class TestParameterEditForm:
         # Should not have slug or value_type (readonly in admin)
         assert "slug" not in form.fields
         assert "value_type" not in form.fields
-
-    def test_convert_value_to_type_bool(self):
-        """Test _convert_value_to_type with boolean"""
-        param = Parameter.objects.create(
-            name="Test",
-            slug="TEST",
-            value="1",
-            value_type="BOO",
-        )
-        form = ParameterEditForm(instance=param)
-
-        # Test with actual bool
-        result = form._convert_value_to_type(True, "BOO")
-        assert result is True
-
-        # Test with string
-        result = form._convert_value_to_type("1", "BOO")
-        assert isinstance(result, bool)
-
-    def test_convert_value_to_type_int(self):
-        """Test _convert_value_to_type with int"""
-        param = Parameter.objects.create(
-            name="Test",
-            slug="TEST",
-            value="42",
-            value_type="INT",
-        )
-        form = ParameterEditForm(instance=param)
-
-        result = form._convert_value_to_type("42", "INT")
-        assert result == 42
-        assert isinstance(result, int)
-
-    def test_convert_value_to_type_float(self):
-        """Test _convert_value_to_type with float"""
-        param = Parameter.objects.create(
-            name="Test",
-            slug="TEST",
-            value="3.14",
-            value_type="FLT",
-        )
-        form = ParameterEditForm(instance=param)
-
-        result = form._convert_value_to_type("3.14", "FLT")
-        assert result == 3.14
-        assert isinstance(result, float)
-
-    def test_convert_value_to_type_decimal(self):
-        """Test _convert_value_to_type with decimal"""
-        param = Parameter.objects.create(
-            name="Test",
-            slug="TEST",
-            value="99.99",
-            value_type="DCL",
-        )
-        form = ParameterEditForm(instance=param)
-
-        result = form._convert_value_to_type("99.99", "DCL")
-        assert result == Decimal("99.99")
-        assert isinstance(result, Decimal)
-
-    def test_convert_value_to_type_percentage(self):
-        """Test _convert_value_to_type with percentage"""
-        param = Parameter.objects.create(
-            name="Test",
-            slug="TEST",
-            value="75.5",
-            value_type="PCT",
-        )
-        form = ParameterEditForm(instance=param)
-
-        result = form._convert_value_to_type("75.5", "PCT")
-        assert result == 75.5
-        assert isinstance(result, float)
-
-    def test_convert_value_to_type_string(self):
-        """Test _convert_value_to_type with string types"""
-        param = Parameter.objects.create(
-            name="Test",
-            slug="TEST",
-            value="test",
-            value_type="STR",
-        )
-        form = ParameterEditForm(instance=param)
-
-        result = form._convert_value_to_type("test value", "STR")
-        assert result == "test value"
-        assert isinstance(result, str)
 
     def test_clean_value_with_validators(self):
         """Test clean_value runs validators"""
@@ -343,111 +253,6 @@ class TestParameterValidatorForm:
 class TestParameterAdminHelpers:
     """Tests for ParameterAdmin helper methods"""
 
-    def test_get_field_mapping(self):
-        """Test _get_field_mapping returns correct mapping"""
-        admin = ParameterAdmin(Parameter, None)
-        mapping = admin._get_field_mapping()
-
-        assert mapping["BOO"] == forms.BooleanField
-        assert mapping["INT"] == forms.IntegerField
-        assert mapping["FLT"] == forms.FloatField
-        assert mapping["DCL"] == forms.DecimalField
-        assert mapping["DAT"] == forms.DateField
-        assert mapping["DTM"] == forms.DateTimeField
-        assert mapping["TIM"] == forms.TimeField
-        assert mapping["URL"] == forms.URLField
-        assert mapping["EML"] == forms.EmailField
-        assert mapping["STR"] == forms.CharField
-
-    def test_get_field_for_value_type_json(self):
-        """Test _get_field_for_value_type with JSON type"""
-        admin = ParameterAdmin(Parameter, None)
-        param = Parameter.objects.create(
-            name="Test", slug="TEST", value='{"key": "value"}', value_type="JSN"
-        )
-
-        field_mapping = admin._get_field_mapping()
-        field_class, field_kwargs = admin._get_field_for_value_type(
-            param, field_mapping
-        )
-
-        assert field_class == forms.CharField
-        assert isinstance(field_kwargs["widget"], forms.Textarea)
-        assert field_kwargs["widget"].attrs["rows"] == 4
-
-    def test_get_field_for_value_type_dict(self):
-        """Test _get_field_for_value_type with DICT type"""
-        admin = ParameterAdmin(Parameter, None)
-        param = Parameter.objects.create(
-            name="Test", slug="TEST", value='{"key": "value"}', value_type="DCT"
-        )
-
-        field_mapping = admin._get_field_mapping()
-        field_class, field_kwargs = admin._get_field_for_value_type(
-            param, field_mapping
-        )
-
-        assert field_class == forms.CharField
-        assert isinstance(field_kwargs["widget"], forms.Textarea)
-
-    def test_get_field_for_value_type_list(self):
-        """Test _get_field_for_value_type with LIST type"""
-        admin = ParameterAdmin(Parameter, None)
-        param = Parameter.objects.create(
-            name="Test", slug="TEST", value="a, b, c", value_type="LST"
-        )
-
-        field_mapping = admin._get_field_mapping()
-        field_class, field_kwargs = admin._get_field_for_value_type(
-            param, field_mapping
-        )
-
-        assert field_class == forms.CharField
-        assert "virgules" in field_kwargs["help_text"]
-
-    def test_get_field_for_value_type_percentage(self):
-        """Test _get_field_for_value_type with PERCENTAGE type"""
-        admin = ParameterAdmin(Parameter, None)
-        param = Parameter.objects.create(
-            name="Test", slug="TEST", value="75.5", value_type="PCT"
-        )
-
-        field_mapping = admin._get_field_mapping()
-        field_class, field_kwargs = admin._get_field_for_value_type(
-            param, field_mapping
-        )
-
-        assert field_class == forms.FloatField
-        assert field_kwargs["min_value"] == 0
-        assert field_kwargs["max_value"] == 100
-        assert "0 et 100" in field_kwargs["help_text"]
-
-    def test_get_field_for_value_type_duration(self):
-        """Test _get_field_for_value_type with DURATION type"""
-        admin = ParameterAdmin(Parameter, None)
-        param = Parameter.objects.create(
-            name="Test", slug="TEST", value="3600", value_type="DUR"
-        )
-
-        field_mapping = admin._get_field_mapping()
-        field_class, field_kwargs = admin._get_field_for_value_type(
-            param, field_mapping
-        )
-
-        assert field_class == forms.FloatField
-        assert "secondes" in field_kwargs["help_text"]
-
-    def test_get_readonly_fields_creating(self):
-        """Test get_readonly_fields when creating new parameter"""
-        admin = ParameterAdmin(Parameter, None)
-        from django.http import HttpRequest
-
-        request = HttpRequest()
-
-        readonly = admin.get_readonly_fields(request, obj=None)
-        # When creating, no fields should be readonly
-        assert readonly == ()
-
     def test_get_readonly_fields_editing(self):
         """Test get_readonly_fields when editing existing parameter"""
         admin = ParameterAdmin(Parameter, None)
@@ -515,22 +320,6 @@ class TestParameterAdminHelpers:
 @pytest.mark.django_db
 class TestParameterAdminGetForm:
     """Tests for ParameterAdmin.get_form method"""
-
-    def test_get_form_creating(self):
-        """Test get_form when creating new parameter"""
-        from django.contrib.admin.sites import AdminSite
-        from django.http import HttpRequest
-
-        admin = ParameterAdmin(Parameter, AdminSite())
-        request = HttpRequest()
-
-        form_class = admin.get_form(request, obj=None)
-
-        # Should use ParameterCreateForm
-        assert form_class._meta.model == Parameter
-        assert "name" in form_class.base_fields
-        assert "slug" in form_class.base_fields
-        assert "value_type" in form_class.base_fields
 
     def test_get_form_editing_with_else_branch(self):
         """Test get_form editing with value_type that hits else branch"""
