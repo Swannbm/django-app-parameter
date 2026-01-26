@@ -2,6 +2,13 @@
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [3.1.0] - 2026.01.26
+
+### Changed:
+* **value size**: replace how value is stored in DB, use a TextField instead of a CharField to be able to store any sized JSON or DICT...
+
+## [3.0.1] - 2026.01.20
+
 ## [3.0.0] - 2026.01.20
 
 ### Added
