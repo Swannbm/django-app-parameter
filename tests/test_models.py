@@ -1,4 +1,4 @@
-"""Unit tests for Parameter model methods: _cast_from_str, _cast_to_str, _is_instance."""
+"""Unit tests for Parameter model methods: cast and type check."""
 
 from __future__ import annotations
 
@@ -74,7 +74,9 @@ class TestParameterCastFromStr:
 
     def test_parameter_decimal_cast_from_str_invalid(self):
         param = ParameterDecimal(name="test")
-        with pytest.raises(Exception):  # InvalidOperation
+        from decimal import InvalidOperation
+
+        with pytest.raises(InvalidOperation):
             param._cast_from_str("not_decimal")
 
     def test_parameter_bool_cast_from_str_truthy(self):

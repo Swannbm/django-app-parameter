@@ -212,7 +212,7 @@ For encryption setup, see [Encryption](#encryption) section above.
 
 ## Info
 
-- **Version:** 3.1.0
+- **Version:** 3.2.0
 - **License:** CC0 1.0 Universal
 - **Python:** 3.10+
 - **Django:** 4.2 - 6.0
