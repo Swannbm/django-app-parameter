@@ -5,7 +5,10 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("django_app_parameter", "0008_parameterbool_parameterdate_parameterdatetime_and_more"),
+        (
+            "django_app_parameter",
+            "0008_parameterbool_parameterdate_parameterdatetime_and_more",
+        ),
     ]
 
     operations = [
