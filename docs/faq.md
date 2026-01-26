@@ -3,13 +3,13 @@
 ## Installation
 
 ### Requirements?
-- Python 3.7+
-- Django 3.2+
+- Python 3.10+
+- Django 4.2+
 - All Django-supported databases (PostgreSQL, MySQL, SQLite, Oracle)
 
 ### Uninstall?
 ```bash
-python manage.py dumpdata django_app_parameter > backup.json  # Optional
+python manage.py dumpdata django_app_parameter > backup.json  # backup optional
 python manage.py migrate django_app_parameter zero
 pip uninstall django-app-parameter
 ```
@@ -28,7 +28,7 @@ Parameter.objects.create(name="Site Title", value="My Site", value_type=TYPES.ST
 
 **Command**:
 ```bash
-python manage.py load_param --json '[{"name": "Site Title", "value": "My Site"}]'
+python manage.py dap_load --json '[{"name": "Site Title", "value": "My Site"}]'
 ```
 
 ### Access parameter?
@@ -65,15 +65,15 @@ param.set("19.6", auto_cast=True)  # Converts to Decimal, validates, saves
 
 ### Supported types?
 
-**Basic (5)**: INT, STR, FLT, DCL, BOO
+**Basic (5)**: INTEGER, STRING, FLOAT, DECIMAL, BOOL
 
 **Date/Time (4)**: DATE, DATETIME, TIME, DURATION
 
 **Validated (3)**: URL, EMAIL, PERCENTAGE
 
-**Structured (4)**: JSN, LIST, DICT, PATH
+**Structured (4)**: JSON, LIST, DICT, PATH
 
-**Total**: 15 types
+**Total**: 16 types
 
 ### FLT vs DCL?
 - **FLT**: Approximate, for scientific calculations
@@ -235,20 +235,20 @@ Security: Prevents exposing sensitive params to templates.
 
 ### Import many parameters?
 ```bash
-python manage.py load_param --file parameters.json
+python manage.py dap_load --file parameters.json
 ```
 
 See [management-commands.md](management-commands.md).
 
 ### Avoid overwriting?
 ```bash
-python manage.py load_param --no-update --file defaults.json
+python manage.py dap_load --no-update --file defaults.json
 ```
 Creates new only, skips existing.
 
 ### Export parameters?
 ```bash
-python manage.py dump_param backup.json
+python manage.py dap_dump backup.json
 ```
 
 Exports all parameters with validators.
@@ -275,10 +275,10 @@ No hard limit. Hundreds work fine. Cache if performance issues.
 ## Security
 
 ### Store passwords?
-**NO**. No encryption. Use environment variables for secrets.
+**With caution**. Encryption is available via `enable_cypher=True`, but environment variables are still recommended for highly sensitive secrets like database passwords.
 
 ### Store API keys?
-**NO**. Use Django settings or env vars.
+**Yes, with encryption**. Enable `enable_cypher=True` on the parameter. Requires `cryptography` package.
 
 ### What's safe to store?
 - Business config (tax rates, limits)
@@ -287,6 +287,8 @@ No hard limit. Hundreds work fine. Cache if performance issues.
 - Non-sensitive URLs
 - Dates, durations
 - Public emails
+- API keys (with encryption enabled)
+- Sensitive configuration (with encryption enabled)
 
 ## Admin
 
@@ -396,7 +398,6 @@ Use env vars for secrets, app_parameter for business params.
 
 ## Next
 
-- [Installation](installation.md)
 - [Usage Guide](usage-guide.md)
 - [Management Commands](management-commands.md)
 - [Tests](../tests/test_django_app_parameter.py)

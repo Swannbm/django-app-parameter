@@ -7,7 +7,7 @@ Django App Parameter
    :alt: Python Version
    :target: https://pypi.org/project/django-app-parameter/
 
-.. image:: https://img.shields.io/badge/django-4.2%20%7C%205.2-blue
+.. image:: https://img.shields.io/badge/django-4.2%20%7C%205.2%20%7C%206.0-blue
    :alt: Django Version
    :target: https://www.djangoproject.com/
 
@@ -21,7 +21,7 @@ Key Features
 - **Database-backed configuration**: Store parameters in your database instead of hardcoded settings
 - **Runtime modification**: Change configuration without redeploying or restarting your application
 - **Django Admin integration**: Full CRUD operations through the familiar Django admin interface
-- **Type safety**: Support for 15+ data types with automatic type conversion
+- **Type safety**: Support for 16 data types with automatic type conversion
 - **Validation**: Built-in Django validators to ensure data integrity
 - **Encryption**: Optional encryption for sensitive values (requires cryptography package)
 - **History tracking**: Track parameter value changes over time (v2.1.0+)
@@ -66,12 +66,11 @@ Usage Example
    # Get a parameter value (recommended way)
    max_items = app_parameter.MAX_ITEMS_PER_PAGE  # Returns typed value
 
-   # Alternative: Use the manager with type-safe methods
+   # Alternative: Use the model directly
    from django_app_parameter.models import Parameter
 
-   max_items = Parameter.objects.int("MAX_ITEMS_PER_PAGE", default=10)
-   site_name = Parameter.objects.str("SITE_NAME", default="My Site")
-   is_enabled = Parameter.objects.bool("FEATURE_ENABLED", default=False)
+   param = Parameter.objects.get(slug="MAX_ITEMS_PER_PAGE")
+   max_items = param.get()  # Returns typed value (int, str, etc.)
 
 Documentation
 -------------

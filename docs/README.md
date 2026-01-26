@@ -186,7 +186,7 @@ value = param.get()  # Automatically decrypted
 - Max encrypted value: ~190 chars (Fernet overhead: ~60 bytes)
 - Admin shows encrypted field as checkbox
 
-For key rotation and advanced usage, see [Management Commands](docs/management-commands.md#encryption).
+For key rotation and advanced usage, see [Management Commands](management-commands.md#dap_rotate_key).
 
 ## vs. Alternatives
 
@@ -198,24 +198,23 @@ Use env vars for secrets (API keys, passwords), app_parameter for business param
 
 ## Limits
 
-1. **250 char limit** (or ~190 chars for encrypted values)
-2. **DB query per access** (consider caching)
-3. **Encryption available** (see [Encryption](../README.md#encryption) in main README)
-4. **Templates: strings only**
+1. **DB query per access** (consider caching)
+2. **Encryption available** (see [Encryption](#encryption) section above)
+3. **Templates: strings only**
 
 ## Documentation
 
-- [Installation](installation.md) - Setup guide
 - [Usage Guide](usage-guide.md) - Examples
 - [Management Commands](management-commands.md) - CLI tools (load, dump, key rotation)
 - [FAQ](faq.md)
 
-For encryption setup, see [Encryption](../README.md#encryption) in the main README.
+For encryption setup, see [Encryption](#encryption) section above.
 
 ## Info
 
 - **Version:** 3.1.0
 - **License:** CC0 1.0 Universal
-- **Python:** 3.7+
+- **Python:** 3.10+
+- **Django:** 4.2 - 6.0
 - **Test Coverage:** 100%
 - **Repository:** [github.com/Swannbm/django-app-parameter](https://github.com/Swannbm/django-app-parameter)

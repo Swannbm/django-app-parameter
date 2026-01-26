@@ -4,7 +4,7 @@
 
 Import parameters from JSON file or string.
 
-> **Backward Compatibility**: The `dap_load` command is **backward compatible** and can load dumps from any previous version (v1.x, v2.0, v2.1+). Missing fields automatically use default values. See [dump-format-versions.md](dump-format-versions.md) for details.
+> **Backward Compatibility**: The `dap_load` command is **backward compatible** and can load dumps from any previous version (v1.x, v2.0, v2.1+). Missing fields automatically use default values.
 
 ### Syntax
 
