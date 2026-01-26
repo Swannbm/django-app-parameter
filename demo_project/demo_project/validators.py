@@ -1,9 +1,10 @@
 """Custom validators for demo_project."""
+from datetime import datetime
 
 from django.core.exceptions import ValidationError
 
 
-def validate_business_hours(value: str) -> None:
+def validate_business_hours(value: datetime) -> None:
     """
     Validate that the time is during business hours (9:00 - 18:00).
 
@@ -13,8 +14,9 @@ def validate_business_hours(value: str) -> None:
     Raises:
         ValidationError: If time is outside business hours
     """
+
     try:
-        hour = int(value.split(":")[0])
+        hour = value.hour
     except (ValueError, IndexError) as e:
         raise ValidationError(f"Format invalide: {value}. Attendu: HH:MM:SS") from e
 
