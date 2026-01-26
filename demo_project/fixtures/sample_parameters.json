@@ -108,7 +108,7 @@
         "value": "09:00:00",
         "description": "Business opening time",
         "is_global": true,
-        "value_type": "TIME",
+        "value_type": "TIM",
         "validators": [
             {
                 "validator_type": "business_hours",
@@ -126,6 +126,100 @@
             {
                 "validator_type": "age",
                 "validator_params": {"min_age": 18, "max_age": 120}
+            }
+        ]
+    },
+    {
+        "name": "Tax Rate",
+        "value": "19.6",
+        "description": "Default tax rate percentage",
+        "is_global": true,
+        "value_type": "FLT"
+    },
+    {
+        "name": "Product Price",
+        "value": "49.99",
+        "description": "Default product price with precise decimal",
+        "is_global": false,
+        "value_type": "DCL"
+    },
+    {
+        "name": "Feature Flags",
+        "value": "{\"dark_mode\": true, \"beta_features\": false, \"max_retries\": 3}",
+        "description": "JSON configuration for feature flags",
+        "is_global": true,
+        "value_type": "JSN"
+    },
+    {
+        "name": "Launch Date",
+        "value": "2025-06-15",
+        "description": "Product launch date",
+        "is_global": true,
+        "value_type": "DAT"
+    },
+    {
+        "name": "Last Sync",
+        "value": "2025-01-15T14:30:00",
+        "description": "Last synchronization timestamp",
+        "is_global": false,
+        "value_type": "DTM"
+    },
+    {
+        "name": "Website URL",
+        "value": "https://www.example.com",
+        "description": "Main website URL",
+        "is_global": true,
+        "value_type": "URL"
+    },
+    {
+        "name": "Support Email",
+        "value": "support@example.com",
+        "description": "Support team email address",
+        "is_global": true,
+        "value_type": "EML"
+    },
+    {
+        "name": "Allowed Extensions",
+        "value": "jpg,png,gif,pdf",
+        "description": "Allowed file extensions for uploads",
+        "is_global": true,
+        "value_type": "LST"
+    },
+    {
+        "name": "SMTP Config",
+        "value": "{\"host\": \"smtp.example.com\", \"port\": 587, \"use_tls\": true}",
+        "description": "SMTP server configuration",
+        "is_global": true,
+        "value_type": "DCT"
+    },
+    {
+        "name": "Upload Directory",
+        "value": "/var/www/uploads",
+        "description": "Path to upload directory",
+        "is_global": true,
+        "value_type": "PTH"
+    },
+    {
+        "name": "Session Timeout",
+        "value": "1800",
+        "description": "Session timeout duration in seconds (30 minutes)",
+        "is_global": true,
+        "value_type": "DUR"
+    },
+    {
+        "name": "Discount Rate",
+        "value": "15.5",
+        "description": "Default discount percentage",
+        "is_global": false,
+        "value_type": "PCT",
+        "validators": [
+            {
+                "validator_type": "MinValueValidator",
+                "validator_params": {"limit_value": 0}
+            },
+            {
+                "validator_type": "MaxValueValidator",
+                "validator_params": {"limit_value": 100}
             }
         ]
     }
