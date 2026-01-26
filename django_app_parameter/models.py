@@ -70,7 +70,7 @@ class Parameter(models.Model):
         "Type de donnée", max_length=3, choices=TYPES.choices, default=TYPES.STR
     )
     description = models.TextField("Description", blank=True)
-    value = models.CharField("Valeur", max_length=250)
+    value = models.TextField("Valeur")
 
     # OPTIONS
     is_global = models.BooleanField(default=False)
@@ -439,9 +439,8 @@ class ParameterHistory(models.Model):
         related_name="history",
         verbose_name="Paramètre",
     )
-    value = models.CharField(
+    value = models.TextField(
         "Valeur précédente",
-        max_length=250,
         help_text="Valeur du paramètre avant modification",
     )
     modified_at = models.DateTimeField(
