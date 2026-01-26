@@ -196,11 +196,8 @@ Static vs. Dynamic. Use settings for structure (DATABASES, MIDDLEWARE), app_para
 ### vs. Env vars
 Use env vars for secrets (API keys, passwords), app_parameter for business params.
 
-### vs. django-constance
-More features vs. Simpler. Use constance for advanced needs, app_parameter for simplicity.
-
 ## Limits
-pyth
+
 1. **250 char limit** (or ~190 chars for encrypted values)
 2. **DB query per access** (consider caching)
 3. **Encryption available** (see [Encryption](../README.md#encryption) in main README)
@@ -217,7 +214,7 @@ For encryption setup, see [Encryption](../README.md#encryption) in the main READ
 
 ## Info
 
-- **Version:** 1.1.3
+- **Version:** 3.1.0
 - **License:** CC0 1.0 Universal
 - **Python:** 3.7+
 - **Test Coverage:** 100%

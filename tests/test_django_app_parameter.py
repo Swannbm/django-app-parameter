@@ -468,7 +468,7 @@ class TestParameterManager:
             (TYPES.PATH, ParameterPath),
             (TYPES.DURATION, ParameterDuration),
             (TYPES.PERCENTAGE, ParameterPercentage),
-        ]
+        ],
     )
     def test_get_proxy_class(self, type, expected_class):
         assert get_proxy_class(type) == expected_class
