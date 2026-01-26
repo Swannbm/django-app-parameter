@@ -33,7 +33,7 @@ EOF
 
 # Load sample parameters
 echo "Loading sample parameters..."
-python manage.py load_param --file fixtures/sample_parameters.json
+python manage.py dap_load --file fixtures/sample_parameters.json
 
 echo ""
 echo "=============================================="
