@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
 from django import forms
@@ -95,8 +96,6 @@ class ParameterEditForm(forms.ModelForm):
         elif value_type == TYPES.FLT.value:
             return value if isinstance(value, float) else float(value)
         elif value_type == TYPES.DCL.value:
-            from decimal import Decimal
-
             return value if isinstance(value, Decimal) else Decimal(str(value))
         elif value_type == TYPES.PERCENTAGE.value:
             return value if isinstance(value, int | float) else float(value)
@@ -107,29 +106,14 @@ class ParameterEditForm(forms.ModelForm):
     def clean_value(self) -> Any:
         """Validate the value field using the parameter's validators"""
         value = self.cleaned_data.get("value")
-        instance = self.instance
+        instance: Parameter = self.instance
 
         if not instance or not instance.pk:
             return value
 
         # Convert string value to the appropriate type for validation
         try:
-            typed_value = self._convert_value_to_type(value, instance.value_type)
-
-            # Collect all validation errors
-            error_messages: list[Any] = []
-            for param_validator in instance.validators.all():
-                validator = param_validator.get_validator()
-                try:
-                    validator(typed_value)
-                except Exception as e:
-                    # Collect error message as string
-                    error_messages.append(str(e))
-
-            # If there are errors, raise them all at once
-            if error_messages:
-                raise forms.ValidationError(error_messages)
-
+            instance.set(value, auto_cast=True)
         except (ValueError, TypeError) as e:
             raise forms.ValidationError(
                 f"Valeur invalide pour le type {instance.get_value_type_display()}: {e}"
@@ -353,7 +337,7 @@ class ParameterAdmin(_ModelAdmin):
         if change and "value" in form.cleaned_data:
             # For updates, use the model's set() method
             new_value = form.cleaned_data["value"]
-            obj.set(new_value)
+            obj.set(new_value, auto_cast=True)
         else:
             # For new objects, set a default empty value based on type
             if not change:
